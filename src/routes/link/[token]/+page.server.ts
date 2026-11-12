@@ -1,0 +1,11 @@
+import { fail, redirect } from '@sveltejs/kit';
+import { startSession, useHandoff } from '#lib/server/auth.ts';
+
+export const actions = {
+	default: async ({ params, cookies }) => {
+		const userId = useHandoff(params.token);
+		if (!userId) return fail(400, { error: 'This sign-in link has expired or was already used. Ask for a new one.' });
+		startSession(cookies, userId);
+		redirect(303, '/');
+	}
+};

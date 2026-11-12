@@ -1,0 +1,100 @@
+# The Photo Game — design notes
+
+A mobile-first website for a family photo scavenger hunt. A showrunner sets up
+categories; teams hunt for them during the day, upload photos, and everyone
+looks through the day's photos together at night, votes, and wins prizes.
+
+## Decisions
+
+| Topic | Decision |
+|---|---|
+| Platform | Mobile website (iPhone and Android), Jackbox-style join link |
+| Hosting | Single Docker container behind Caddy, on its own subdomain |
+| Email | Sent through the existing SMTP server |
+| Competitors | Colored teams; a team can be one person. Every photo is credited to the person who took it |
+| Teams | Per game: the admin assigns teams, or players team up themselves. A max team size is shown; admins can exceed it and the team is flagged as oversized |
+| Scoring | Each photo earns points from its category's scoring options, plus voted awards, pencilled-in awards and optional bingo bonuses |
+| Voting | Approval voting: vote for as many photos as you like, most votes wins |
+| Submissions | Any number per category, on the honor system. Optional per-category cap on how many photos score; admins can disqualify |
+| Visibility | Per game: photos hidden until the showrunner reveals them, or always visible |
+| Structure | Categories can carry a day label, so a game can be trip-long, daily, or mixed |
+| Media | Photos only |
+| Content | Generic. The showrunner enters categories in the admin screens; nothing is hard-coded |
+
+## Stack
+
+- **SvelteKit** (Node adapter): one process serves pages and API.
+- **SQLite** (Node's built-in driver) in a Docker volume, next to the photo
+  files. Backup = copy one folder.
+- **sharp** makes thumbnails and screen-sized copies; originals are kept.
+- **SimpleWebAuthn** for passkeys, **nodemailer** for email.
+- Configuration by environment variables: `ORIGIN`, `ADMIN_EMAIL`, `SMTP_*`,
+  `DATA_DIR`, `TZ`.
+
+## Sign-in
+
+Goal: it just works, and everyone has a unique email on file.
+
+1. Open the join link, enter name and email. A new email is signed in
+   immediately; the phone stays signed in for months.
+2. An email that already has an account gets a six-digit code first, so
+   nobody can join as someone else.
+3. The account page offers to save a passkey (Face ID / fingerprint).
+4. Signing in again, on any device: passkey, emailed code, or a QR code shown
+   by a device that is already signed in.
+5. Admins can produce a sign-in link / QR for any player.
+
+## Categories and scoring
+
+The sample sheet scores each photo individually, with tiers and extras, e.g.
+"own name 1 pt, rarest names 3 pts" or "1 pt flat, +0.5 per extra matching
+item". So a category has a list of **scoring options**:
+
+- **Tier**: pick one per photo ("Assigned color — 1", "Color match — 2",
+  "Color and texture match — 3").
+- **Extra**: a per-unit add-on with a quantity ("+0.5 per additional item",
+  "1 per person posing").
+
+Points can be fractional (0.5).
+
+The person uploading claims the tier and extras for their photo (honor
+system). Checks on that:
+
+- **Doubt**: players on other teams can doubt a photo. When more than the
+  game's doubt limit (default 2) doubt it, the photo goes **under review**:
+  it earns nothing while everyone votes agree / disagree, and an admin settles
+  it (approve or disqualify) with the tally in front of them.
+- **Admin override**: an admin can set any photo's points directly, move it
+  to another category, disqualify or delete it.
+- **Cap**: a category can limit how many photos per team score (the best ones
+  count). All photos stay eligible for votes.
+
+## Awards
+
+- **Voted awards**: name, bonus points, and scope — *best in each category*
+  or *across all photos*. The admin opens and closes each award's voting.
+  You can't vote for your own team's photos. Ties share the win: each tied
+  photo's team gets the full bonus. Results show once voting closes.
+- **Pencilled-in awards**: at any time the showrunner can give points to a
+  team (optionally crediting one person) with a title and note, attached to
+  one photo, several photos, or none.
+- **Bingo** (per game, optional): the board is a grid; the admin sets points
+  for each completed row / column / diagonal and for a full board. Either can
+  be 0.
+
+## Screens
+
+Player: **Board** (bingo grid or checklist in team color), **Category**
+(rules, scoring, upload), **Gallery** (by category, team, day), **Photo**
+(points, doubt, review vote), **Slideshow** (for the nightly look-through),
+**Vote**, **Scores** (teams, people, awards), **Account**.
+
+Admin: **Game** settings (visibility, reveal, team mode, max team size, doubt
+limit, bingo, submissions open/closed, download all), **Categories**,
+**Awards**, **Teams & players**, and site-wide **Users** and **Games**.
+
+## Visibility
+
+In hidden mode a player sees their own team's photos, plus anything uploaded
+before the last reveal. "Reveal now" makes everything uploaded so far visible;
+doubting and voting only apply to photos a player can see.
