@@ -1,40 +1,51 @@
 <script lang="ts">
-	import { startAuthentication } from '@simplewebauthn/browser';
+	import { passkeySignIn } from '#lib/passkey.ts';
 	let { data, form } = $props();
+	let email = $state(form?.email ?? data.email);
 	let busy = $state(false);
-	let pkError = $state('');
+	let passkeyFailed = $state(false);
+	let useCode = false;
 
-	async function passkey() {
+	// Email first. If this person saved a passkey we ask for it; otherwise the form posts and a code is emailed.
+	async function submit(e: SubmitEvent) {
+		if (useCode) return;
+		e.preventDefault();
+		const formEl = e.currentTarget as HTMLFormElement;
 		busy = true;
-		pkError = '';
-		try {
-			const options = await (await fetch('/auth/passkey/login-options', { method: 'POST' })).json();
-			const response = await startAuthentication({ optionsJSON: options });
-			const res = await fetch('/auth/passkey/login-verify', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify(response)
-			});
-			if (!res.ok) throw new Error((await res.json()).message);
+		passkeyFailed = false;
+		const result = await passkeySignIn(email);
+		if (result === 'ok') {
 			location.href = data.next;
-		} catch (e: any) {
-			if (e?.name !== 'NotAllowedError') pkError = e?.message || 'That passkey didn’t work. Try an email code instead.';
+			return;
 		}
+		if (result === 'none') {
+			useCode = true;
+			formEl.requestSubmit();
+			return;
+		}
+		passkeyFailed = true;
 		busy = false;
 	}
 </script>
 
 <main>
 	<h1>Sign in</h1>
-	<div class="card stack">
-		<button class="primary" onclick={passkey} disabled={busy}>Use a passkey</button>
-		{#if pkError}<p class="err">{pkError}</p>{/if}
-		<p class="muted small">Face ID, fingerprint or screen lock, if you saved one on this device.</p>
-	</div>
-	<form method="POST" class="card stack">
+	<form method="POST" class="card stack" onsubmit={submit}>
 		<input type="hidden" name="next" value={data.next} />
-		<label>Or get a code by email <input name="email" type="email" autocomplete="email" inputmode="email" required /></label>
-		{#if form?.error}<p class="err">{form.error}</p>{/if}
-		<button>Email me a code</button>
+		<label>
+			Email
+			<input name="email" type="email" autocomplete="username webauthn" inputmode="email" required bind:value={email} />
+		</label>
+		{#if form?.error && !passkeyFailed}<p class="err">{form.error}</p>{/if}
+		{#if passkeyFailed}
+			<p class="err">Your passkey didn’t work on this device.</p>
+			<button class="primary" disabled={busy}>Try the passkey again</button>
+			<button disabled={busy} onclick={() => (useCode = true)}>Email me a code instead</button>
+		{:else}
+			<button class="primary" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+			<p class="muted small" style="margin:0">
+				If you saved a passkey, your phone will ask for it. Otherwise we’ll email you a six-digit code.
+			</p>
+		{/if}
 	</form>
 </main>

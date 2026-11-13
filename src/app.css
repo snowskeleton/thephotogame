@@ -52,7 +52,7 @@ main { max-width: 720px; margin: 0 auto; padding: 16px 16px 110px; }
 label { display: grid; gap: 4px; font-weight: 600; font-size: 0.9rem; }
 label.check { display: flex; gap: 8px; align-items: center; font-weight: 500; font-size: 1rem; }
 input, select, textarea, button { font: inherit; color: inherit; }
-input[type='text'], input[type='email'], input[type='number'], input:not([type]), select, textarea {
+input[type='text'], input[type='email'], input[type='search'], input[type='number'], input:not([type]), select, textarea {
 	width: 100%;
 	padding: 11px 12px;
 	border: 1.5px solid var(--line);

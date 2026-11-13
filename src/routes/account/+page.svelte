@@ -17,7 +17,7 @@
 				body: JSON.stringify(response)
 			});
 			if (!res.ok) throw new Error((await res.json()).message);
-			pkMsg = 'Passkey saved. Next time, tap “Use a passkey” to sign in.';
+			pkMsg = 'Passkey saved. Next time you sign in here, you won’t need an email code.';
 			invalidateAll();
 		} catch (e: any) {
 			if (e?.name === 'InvalidStateError') pkMsg = 'This device already has a passkey for you.';

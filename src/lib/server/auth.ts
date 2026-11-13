@@ -115,6 +115,21 @@ export function useHandoff(token: string): number | null {
 	return row.expires_at < now() ? null : row.user_id;
 }
 
+/** Emails a one-time sign-in link (good for a week) to someone an admin added. */
+export async function sendInvite(
+	user: { id: number; email: string; name: string },
+	origin: string,
+	from: string,
+	game?: { code: string; name: string }
+) {
+	const link = `${origin}/link/${makeHandoff(user.id, 7 * 24 * 60)}${game ? `?next=/g/${game.code}` : ''}`;
+	await sendMail(
+		user.email,
+		game ? `You're in: ${game.name}` : 'Your Photo Game sign-in link',
+		`Hi ${user.name},\n\n${from} added you to ${game ? `“${game.name}” on ` : ''}The Photo Game.\n\nTap to sign in:\n\n    ${link}\n\nThe link works once, for 7 days. After that you can sign in any time at ${origin}/login with this email address.`
+	);
+}
+
 /** Only allow redirects back into this site. */
 export function safeNext(v: unknown, fallback = '/'): string {
 	const s = String(v ?? '');

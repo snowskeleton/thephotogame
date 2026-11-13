@@ -40,9 +40,20 @@ Goal: it just works, and everyone has a unique email on file.
 2. An email that already has an account gets a six-digit code first, so
    nobody can join as someone else.
 3. The account page offers to save a passkey (Face ID / fingerprint).
-4. Signing in again, on any device: passkey, emailed code, or a QR code shown
-   by a device that is already signed in.
-5. Admins can produce a sign-in link / QR for any player.
+4. Signing in again, on any device: enter your email and tap Sign in. If a
+   passkey is saved for that email the device asks for it; if there is none
+   (or it fails and you choose so) a six-digit code is emailed instead. A QR
+   code shown by a device that is already signed in also works.
+
+## People (admin)
+
+Admin → People lists everyone with search and filters (admins, not signed in
+yet). Admins can add one person or paste a list, make someone an admin, put
+them in a game, and optionally email a one-time sign-in link (good for 7
+days). Each person's page edits name, email and admin rights, games and
+teams, shows a sign-in link / QR, emails a link, signs them out everywhere,
+removes passkeys, or deletes them. Admins can't remove their own admin rights
+or delete themselves, so there is always one admin.
 
 ## Categories and scoring
 

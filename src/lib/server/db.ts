@@ -155,6 +155,11 @@ CREATE INDEX IF NOT EXISTS photo_game ON photo(game_id, category_id);
 CREATE INDEX IF NOT EXISTS member_user ON member(user_id);
 `);
 
+// Columns added after the first release.
+const hasColumn = (table: string, col: string) =>
+	(db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).some((c) => c.name === col);
+if (!hasColumn('user', 'last_seen_at')) db.exec('ALTER TABLE user ADD COLUMN last_seen_at INTEGER');
+
 type P = SQLInputValue;
 const cache = new Map<string, ReturnType<typeof db.prepare>>();
 function stmt(sql: string) {

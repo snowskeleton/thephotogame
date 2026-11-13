@@ -12,6 +12,8 @@ const transport = host
 		})
 	: null;
 
+export const mailReady = !!transport;
+
 export async function sendMail(to: string, subject: string, text: string) {
 	if (!transport) {
 		console.log(`[mail not configured] to=${to} subject=${subject}\n${text}`);

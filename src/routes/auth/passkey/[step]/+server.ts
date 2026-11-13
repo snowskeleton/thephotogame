@@ -6,7 +6,7 @@ import {
 	verifyRegistrationResponse
 } from '@simplewebauthn/server';
 import { all, get, now, run } from '#lib/server/db.ts';
-import { startSession } from '#lib/server/auth.ts';
+import { cleanEmail, startSession } from '#lib/server/auth.ts';
 
 const CH = 'pg_challenge';
 
@@ -62,7 +62,21 @@ export const POST = async ({ params, request, cookies, locals, url }) => {
 			return json({ ok: true });
 		}
 		case 'login-options': {
-			const options = await generateAuthenticationOptions({ rpID, userVerification: 'preferred' });
+			// Email first: only offer a passkey prompt when this person has one saved.
+			const body = await request.json().catch(() => ({}));
+			const email = cleanEmail(body?.email);
+			const keys = email
+				? all<{ id: string; transports: string }>(
+						'SELECT k.id, k.transports FROM passkey k JOIN user u ON u.id = k.user_id WHERE u.email = ?',
+						email
+					)
+				: [];
+			if (!keys.length) return json({ passkey: false });
+			const options = await generateAuthenticationOptions({
+				rpID,
+				userVerification: 'preferred',
+				allowCredentials: keys.map((k) => ({ id: k.id, transports: JSON.parse(k.transports || '[]') }))
+			});
 			remember(options.challenge);
 			return json(options);
 		}

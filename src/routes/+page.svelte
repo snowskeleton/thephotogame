@@ -13,7 +13,7 @@
 			<p class="muted">You aren't in a game yet. Enter a game code below, or open your join link.</p>
 		{/each}
 		{#if data.user.is_admin}
-			<a class="btn" href="/admin">Admin: games &amp; users</a>
+			<a class="btn" href="/admin">Admin: games &amp; people</a>
 		{/if}
 	{:else}
 		<h1>Find it. Snap it. Win it.</h1>
