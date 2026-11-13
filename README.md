@@ -11,7 +11,7 @@ cp .env.example .env    # then edit it
 docker compose up -d --build
 ```
 
-The app listens on `127.0.0.1:3000`. Everything it stores (the SQLite database
+The app listens on `127.0.0.1:3000` unless `BIND` in `.env` says otherwise. Everything it stores (the SQLite database
 and all photos) lives in `./data`; back up that folder.
 
 Caddy:
