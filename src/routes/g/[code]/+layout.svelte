@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tv } from '#lib/colors.ts';
 	import { page } from '$app/state';
 	let { children, data } = $props();
 	const base = $derived(`/g/${data.game.code}`);
@@ -13,7 +14,7 @@
 	]);
 </script>
 
-<div style="--team:{data.team?.color ?? 'var(--accent)'}">
+<div style="{tv(data.team?.color ?? 'var(--accent)')}">
 	<main>
 		<div class="spread" style="margin-bottom:12px">
 			<strong class="muted">{data.game.name}</strong>

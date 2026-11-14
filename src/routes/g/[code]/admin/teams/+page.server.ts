@@ -2,7 +2,8 @@ import { fail } from '@sveltejs/kit';
 import QRCode from 'qrcode';
 import { cleanEmail, createUser, findUserByEmail, makeHandoff } from '#lib/server/auth.ts';
 import { all, get, insert, run } from '#lib/server/db.ts';
-import { gameByCode, requireAdmin, str, TEAM_COLORS } from '#lib/server/game.ts';
+import { validColor } from '#lib/colors.ts';
+import { gameByCode, requireAdmin, str } from '#lib/server/game.ts';
 
 export const load = ({ params }) => {
 	const game = gameByCode(params.code);
@@ -18,12 +19,11 @@ export const load = ({ params }) => {
 				(SELECT COUNT(*) FROM photo p WHERE p.user_id = u.id AND p.game_id = m.game_id) AS photos
 			 FROM member m JOIN user u ON u.id = m.user_id WHERE m.game_id = ? ORDER BY m.team_id IS NOT NULL, u.name`,
 			game.id
-		),
-		colors: TEAM_COLORS
+		)
 	};
 };
 
-const color = (v: unknown) => (/^#[0-9a-f]{6}$/i.test(String(v)) ? String(v) : null);
+const color = validColor;
 
 export const actions = {
 	addTeam: async ({ request, params, locals }) => {

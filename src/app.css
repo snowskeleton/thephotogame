@@ -78,7 +78,7 @@ textarea { min-height: 84px; resize: vertical; }
 	min-height: 44px;
 }
 .btn.primary, button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-.btn.team, button.team { background: var(--team); border-color: var(--team); color: #fff; }
+.btn.team, button.team { background: var(--team-bg, var(--team)); border-color: var(--team); color: var(--team-ink, #fff); }
 .btn.danger, button.danger { color: var(--bad); }
 .btn.sm, button.sm { padding: 6px 12px; min-height: 34px; font-size: 0.86rem; }
 .btn.block, button.block { width: 100%; }
@@ -96,10 +96,10 @@ button:disabled { opacity: 0.5; cursor: default; }
 	font-weight: 700;
 	white-space: nowrap;
 }
-.pill.team { background: var(--team); color: #fff; }
+.pill.team { background: var(--team-bg, var(--team)); color: var(--team-ink, #fff); }
 .pill.warn { background: #f5b800; color: #23201c; }
 .pill.bad { background: var(--bad); color: #fff; }
-.dot { width: 12px; height: 12px; border-radius: 50%; background: var(--team); display: inline-block; flex: none; }
+.dot { width: 12px; height: 12px; border-radius: 50%; background: var(--team-bg, var(--team)); display: inline-block; flex: none; }
 .topbar {
 	display: flex;
 	align-items: center;
@@ -158,3 +158,8 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
 .subnav a.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 details > summary { cursor: pointer; font-weight: 700; }
 hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
+
+/* Metallic and shimmer team colors are gradients; sliding them gives a slow sheen. Solid colors are unaffected. */
+.btn.team, button.team, .pill.team, .dot { background-size: 200% 200%; animation: sheen 6s ease-in-out infinite alternate; }
+@keyframes sheen { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; } }

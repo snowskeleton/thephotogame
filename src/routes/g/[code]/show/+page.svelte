@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tv } from '#lib/colors.ts';
 	let { data } = $props();
 	let i = $state(0);
 	let playing = $state(false);
@@ -29,7 +30,7 @@
 			<span>{i + 1} / {data.photos.length}</span>
 			<button class="sm" onclick={() => (playing = !playing)}>{playing ? '⏸ Pause' : '▶ Play'}</button>
 		</div>
-		<div class="bar bottom" style="--team:{p.color}">
+		<div class="bar bottom" style="{tv(p.color)}">
 			<div>
 				<strong>{p.category}</strong>
 				{#if p.caption}<div>{p.caption}</div>{/if}

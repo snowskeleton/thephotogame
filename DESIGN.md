@@ -45,6 +45,19 @@ Goal: it just works, and everyone has a unique email on file.
    (or it fails and you choose so) a six-digit code is emailed instead. A QR
    code shown by a device that is already signed in also works.
 
+5. After signing in with a code, a link or a fresh join, the next page offers
+   to save a passkey on that device ("Not now" stops it asking for 30 days).
+
+Sign-in fields are plain form fields read at submit time, never bound to
+script state, so browser autofill and password managers can't be overwritten.
+
+## Team colors
+
+A team's color is a hex value or a named finish from `src/lib/colors.ts`:
+metallics (gold, silver, bronze, ...) and shimmer gradients (holographic,
+sunset, galaxy, ...). The picker groups them into palettes and is the same
+when creating and editing a team. `tv(color)` produces the CSS variables.
+
 ## People (admin)
 
 Admin → People lists everyone with search and filters (admins, not signed in

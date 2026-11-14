@@ -1,4 +1,5 @@
 <script lang="ts">
+	import CopyLink from '#lib/components/CopyLink.svelte';
 	import { enhance } from '$app/forms';
 	import { plural } from '#lib/format.ts';
 	let { data, form } = $props();
@@ -28,7 +29,8 @@
 <div class="card stack">
 	<h2 style="margin:0">Invite players</h2>
 	<img src={data.qr} alt="Join QR code" style="width:200px;border-radius:12px;margin:0 auto" />
-	<input readonly value={data.link} onfocus={(e) => e.currentTarget.select()} />
+	<CopyLink value={data.link} label="Join link" shareTitle={g.name} shareText={`Join “${g.name}” on The Photo Game`} />
+	<CopyLink value={g.code} label="Game code" shareTitle={g.name} />
 </div>
 
 <form method="POST" action="?/save" class="card stack" use:enhance>

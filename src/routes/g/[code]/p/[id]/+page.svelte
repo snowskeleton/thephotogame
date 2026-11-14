@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tv } from '#lib/colors.ts';
 	import { enhance } from '$app/forms';
 	import { pts, plural } from '#lib/format.ts';
 	import ClaimFields from '#lib/components/ClaimFields.svelte';
@@ -12,11 +13,11 @@
 
 {#if data.isNew}<p class="card ok" style="margin-top:8px">Got it! Your photo is in.</p>{/if}
 
-<div class="frame" style="--team:{p.color}">
+<div class="frame" style="{tv(p.color)}">
 	<a href="/media/{p.id}/original" target="_blank" rel="noopener"><img src="/media/{p.id}/large" alt={p.caption || p.category} style="aspect-ratio:{p.width}/{p.height}" /></a>
 </div>
 
-<div class="card stack" style="--team:{p.color}">
+<div class="card stack" style="{tv(p.color)}">
 	<div class="spread">
 		<span class="pill team">{p.who} · {p.team}</span>
 		<span class="muted small">{new Date(p.created_at).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' })}</span>

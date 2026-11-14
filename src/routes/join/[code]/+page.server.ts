@@ -1,5 +1,5 @@
 import { fail, redirect } from '@sveltejs/kit';
-import { cleanEmail, createUser, findUserByEmail, sendCode, startSession } from '#lib/server/auth.ts';
+import { cleanEmail, createUser, findUserByEmail, offerPasskey, sendCode, startSession } from '#lib/server/auth.ts';
 import { run } from '#lib/server/db.ts';
 import { gameByCode, str } from '#lib/server/game.ts';
 
@@ -27,11 +27,11 @@ export const actions = {
 		if (findUserByEmail(email)) {
 			// Existing account: prove it's you before joining as them.
 			await sendCode(email, url.origin);
-			redirect(303, `/login/code?email=${encodeURIComponent(email)}&next=/join/${game.code}`);
+			redirect(303, `/login/code?known=1&email=${encodeURIComponent(email)}&next=/join/${game.code}`);
 		}
 		const id = createUser(email, name);
 		startSession(cookies, id);
 		join(game.id, id);
-		redirect(303, `/g/${game.code}?welcome=1`);
+		redirect(303, offerPasskey(cookies, `/g/${game.code}?welcome=1`));
 	}
 };

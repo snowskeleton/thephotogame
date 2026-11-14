@@ -1,6 +1,7 @@
 import { fail } from '@sveltejs/kit';
 import { all, get, insert, run } from '#lib/server/db.ts';
-import { enter, str, TEAM_COLORS } from '#lib/server/game.ts';
+import { validColor } from '#lib/colors.ts';
+import { enter, str } from '#lib/server/game.ts';
 import { scoreGame } from '#lib/server/scoring.ts';
 
 export const load = ({ params, locals, url }) => {
@@ -31,7 +32,7 @@ export const load = ({ params, locals, url }) => {
 		game.id
 	);
 	const score = scoreGame(game).teams.find((t) => t.id === viewer.teamId) ?? null;
-	return { categories, mine, others, teams, score, colors: TEAM_COLORS };
+	return { categories, mine, others, teams, score };
 };
 
 export const actions = {
@@ -56,9 +57,9 @@ export const actions = {
 		if (viewer.teamId) return fail(400, { error: 'You’re already on a team.' });
 		const f = await request.formData();
 		const name = str(f.get('name'), 40);
-		const color = String(f.get('color') ?? '');
+		const color = validColor(f.get('color'));
 		if (!name) return fail(400, { error: 'Give your team a name.' });
-		if (!/^#[0-9a-f]{6}$/i.test(color)) return fail(400, { error: 'Pick a color.' });
+		if (!color) return fail(400, { error: 'Pick a color.' });
 		const id = insert('INSERT INTO team (game_id, name, color) VALUES (?, ?, ?)', game.id, name, color);
 		run('INSERT OR REPLACE INTO member (game_id, user_id, team_id) VALUES (?, ?, ?)', game.id, viewer.user.id, id);
 	}

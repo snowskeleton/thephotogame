@@ -1,16 +1,18 @@
 <script lang="ts">
 	import { passkeySignIn } from '#lib/passkey.ts';
 	let { data, form } = $props();
-	let email = $state(form?.email ?? data.email);
 	let busy = $state(false);
 	let passkeyFailed = $state(false);
 	let useCode = false;
 
 	// Email first. If this person saved a passkey we ask for it; otherwise the form posts and a code is emailed.
+	// The field is left to the browser (no binding) so autofill and password managers can't be overwritten,
+	// and its value is read from the form at the moment of submitting.
 	async function submit(e: SubmitEvent) {
 		if (useCode) return;
 		e.preventDefault();
 		const formEl = e.currentTarget as HTMLFormElement;
+		const email = String(new FormData(formEl).get('email') ?? '').trim();
 		busy = true;
 		passkeyFailed = false;
 		const result = await passkeySignIn(email);
@@ -26,7 +28,16 @@
 		passkeyFailed = true;
 		busy = false;
 	}
+
+	// Coming back with the Back button restores this page as it was left; make it usable again.
+	function restored(e: PageTransitionEvent) {
+		if (!e.persisted) return;
+		busy = false;
+		useCode = false;
+	}
 </script>
+
+<svelte:window onpageshow={restored} />
 
 <main>
 	<h1>Sign in</h1>
@@ -34,7 +45,17 @@
 		<input type="hidden" name="next" value={data.next} />
 		<label>
 			Email
-			<input name="email" type="email" autocomplete="username webauthn" inputmode="email" required bind:value={email} />
+			<input
+				name="email"
+				type="email"
+				value={form?.email ?? data.email}
+				autocomplete="email"
+				inputmode="email"
+				autocapitalize="none"
+				autocorrect="off"
+				spellcheck="false"
+				required
+			/>
 		</label>
 		{#if form?.error && !passkeyFailed}<p class="err">{form.error}</p>{/if}
 		{#if passkeyFailed}

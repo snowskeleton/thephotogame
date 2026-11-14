@@ -1,4 +1,5 @@
 <script lang="ts">
+	import CopyLink from '#lib/components/CopyLink.svelte';
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import { startRegistration } from '@simplewebauthn/browser';
@@ -56,7 +57,8 @@
 		<h2>Sign in on another device</h2>
 		{#if form?.qr}
 			<img src={form.qr} alt="Sign-in QR code" style="width:100%;max-width:280px;margin:0 auto;border-radius:12px" />
-			<p class="muted small">Scan this with the other device's camera. It works once, for 10 minutes.</p>
+			<p class="muted small">Scan this with the other device's camera, or send yourself the link. It works once, for 10 minutes.</p>
+			<CopyLink value={form.link} label="Sign-in link" />
 		{:else}
 			<p class="muted small">Show a QR code here, scan it with the other phone or tablet, and it signs in as you.</p>
 			<form method="POST" action="?/qr" use:enhance><button class="block">Show QR code</button></form>

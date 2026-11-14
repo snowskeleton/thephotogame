@@ -71,11 +71,6 @@ export function visibleSql(game: Game, viewer: Viewer): { sql: string; params: n
 	};
 }
 
-export const TEAM_COLORS = [
-	'#e5484d', '#f76b15', '#f5b800', '#46a758', '#12a594',
-	'#0090ff', '#6e56cf', '#d6409f', '#8d6e63', '#687076'
-];
-
 export function num(v: unknown, fallback = 0): number {
 	const n = Number(String(v ?? '').trim());
 	return Number.isFinite(n) ? n : fallback;

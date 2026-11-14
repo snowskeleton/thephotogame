@@ -1,4 +1,5 @@
 <script lang="ts">
+	import CopyLink from '#lib/components/CopyLink.svelte';
 	import { enhance } from '$app/forms';
 	import { plural } from '#lib/format.ts';
 	let { data, form } = $props();
@@ -81,7 +82,7 @@
 		</p>
 		{#if form?.link}
 			<img src={form.qr} alt="Sign-in QR code" style="width:220px;margin:0 auto;border-radius:12px" />
-			<input readonly value={form.link} aria-label="Sign-in link" onfocus={(e) => e.currentTarget.select()} />
+			<CopyLink value={form.link} label="Sign-in link" shareText={`Sign in to The Photo Game as ${u.name}`} />
 			<p class="muted small" style="margin:0">Signs in as {u.name}. Works once, for 24 hours.</p>
 		{/if}
 		{#if form?.emailed}<p class="ok">Sign-in link sent to {u.email}.</p>{/if}

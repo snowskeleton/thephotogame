@@ -130,6 +130,16 @@ export async function sendInvite(
 	);
 }
 
+export const PASSKEY_SKIP = 'pg_passkey_asked';
+
+/**
+ * After signing in without a passkey, go via the "save a passkey" page on the way to `next`,
+ * unless this device already saved one or said "not now" recently.
+ */
+export function offerPasskey(cookies: Cookies, next: string): string {
+	return cookies.get(PASSKEY_SKIP) ? next : `/passkey?next=${encodeURIComponent(next)}`;
+}
+
 /** Only allow redirects back into this site. */
 export function safeNext(v: unknown, fallback = '/'): string {
 	const s = String(v ?? '');

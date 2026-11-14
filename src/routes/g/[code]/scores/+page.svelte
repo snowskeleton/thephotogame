@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tv } from '#lib/colors.ts';
 	import { pts } from '#lib/format.ts';
 	import Thumb from '#lib/components/Thumb.svelte';
 	let { data } = $props();
@@ -14,7 +15,7 @@
 
 {#if tab === 'teams'}
 	{#each data.teams as t, i}
-		<div class="card" style="--team:{t.color};border-left:8px solid var(--team)">
+		<div class="card" style="{tv(t.color)};border-left:8px solid var(--team)">
 			<div class="spread">
 				<strong style="font-size:1.1rem">{medal(i)} {t.name}</strong>
 				<strong style="font-size:1.4rem">{pts(t.total)}</strong>
@@ -38,7 +39,7 @@
 			<thead><tr><th>Player</th><th class="n">Photos</th><th class="n">Points</th></tr></thead>
 			<tbody>
 				{#each data.people as p}
-					<tr style="--team:{p.color ?? 'var(--line)'}">
+					<tr style="{tv(p.color ?? 'var(--line)')}">
 						<td><span class="dot"></span> {p.name} <span class="muted small">{p.team ?? 'no team'}</span></td>
 						<td class="n">{p.photos}</td>
 						<td class="n"><strong>{pts(p.points)}</strong></td>
@@ -55,7 +56,7 @@
 		<div class="card stack">
 			<div class="spread"><strong>🗳️ {a.name}</strong><span class="pill">+{pts(a.points)}</span></div>
 			{#each a.winners as w}
-				<div class="row" style="--team:{w.color}">
+				<div class="row" style="{tv(w.color)}">
 					{#if w.visible}<div style="width:72px"><Thumb photo={w} code={data.game.code} /></div>{/if}
 					<div class="grow">
 						<span class="pill team">{w.who} · {w.team}</span>
@@ -68,7 +69,7 @@
 		</div>
 	{/each}
 	{#each data.grants as g}
-		<div class="card stack" style="--team:{g.color}">
+		<div class="card stack" style="{tv(g.color)}">
 			<div class="spread"><strong>🏅 {g.title}</strong><span class="pill">{g.points >= 0 ? '+' : ''}{pts(g.points)}</span></div>
 			<div><span class="pill team">{g.who ? `${g.who} · ` : ''}{g.team}</span></div>
 			{#if g.note}<p class="small" style="margin:0">{g.note}</p>{/if}
@@ -81,5 +82,5 @@
 
 <style>
 	.bar { height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; margin: 10px 0 8px; }
-	.bar div { height: 100%; background: var(--team); border-radius: 999px; }
+	.bar div { height: 100%; background: var(--team-bg, var(--team)); border-radius: 999px; }
 </style>

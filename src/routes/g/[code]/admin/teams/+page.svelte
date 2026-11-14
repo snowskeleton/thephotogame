@@ -1,9 +1,11 @@
 <script lang="ts">
+	import ColorPicker from '#lib/components/ColorPicker.svelte';
+	import CopyLink from '#lib/components/CopyLink.svelte';
+	import { tv } from '#lib/colors.ts';
 	import { enhance } from '$app/forms';
 	let { data, form } = $props();
 	const max = $derived(data.game.max_team_size);
 	const unassigned = $derived(data.players.filter((p) => !p.team_id).length);
-	const taken = $derived(new Set(data.teams.map((t) => t.color.toLowerCase())));
 	const confirmDel = (msg: string) => (e: SubmitEvent) => { if (!confirm(msg)) e.preventDefault(); };
 </script>
 
@@ -18,13 +20,13 @@
 	<div class="card stack" style="border-color:var(--accent);border-width:2px">
 		<h2 style="margin:0">Sign-in for {form.signin.name}</h2>
 		<img src={form.signin.qr} alt="Sign-in QR code" style="width:220px;margin:0 auto;border-radius:12px" />
-		<input readonly value={form.signin.link} onfocus={(e) => e.currentTarget.select()} />
+		<CopyLink value={form.signin.link} label="Sign-in link" shareText={`Sign in to The Photo Game as ${form.signin.name}`} />
 		<p class="muted small" style="margin:0">Scan it with their phone or send them the link. Works once, for 24 hours.</p>
 	</div>
 {/if}
 
 {#each data.teams as t}
-	<details class="card" style="--team:{t.color};border-left:8px solid var(--team)">
+	<details class="card" style="{tv(t.color)};border-left:8px solid var(--team)">
 		<summary>
 			{t.name}
 			<span class="muted small">{t.members}{max ? `/${max}` : ''} players · {t.photos} photos</span>
@@ -33,7 +35,7 @@
 		<form method="POST" action="?/saveTeam" class="stack" style="margin-top:12px" use:enhance>
 			<input type="hidden" name="id" value={t.id} />
 			<label>Name <input name="name" value={t.name} required maxlength="40" /></label>
-			<label>Color <input type="color" name="color" value={t.color} style="width:100%;height:44px;padding:2px" /></label>
+			<ColorPicker value={t.color} taken={data.teams.map((x) => x.color)} />
 			<button>Save team</button>
 		</form>
 		<form method="POST" action="?/deleteTeam" style="margin-top:8px" onsubmit={confirmDel('Delete this team?')}>
@@ -47,12 +49,7 @@
 	<summary>Add a team</summary>
 	<form method="POST" action="?/addTeam" class="stack" style="margin-top:12px" use:enhance>
 		<label>Name <input name="name" required maxlength="40" /></label>
-		<div class="row">
-			{#each data.colors as c}
-				<label class="check" style="opacity:{taken.has(c) ? 0.25 : 1}"><input type="radio" name="color" value={c} required />
-					<span class="dot" style="--team:{c};width:26px;height:26px"></span></label>
-			{/each}
-		</div>
+		{#key data.teams.length}<ColorPicker taken={data.teams.map((t) => t.color)} />{/key}
 		<button class="primary">Add team</button>
 	</form>
 </details>
@@ -95,7 +92,7 @@
 		<button class="primary">Add player</button>
 	</form>
 </details>
-<p class="muted small">Edit names, emails and admin rights under <a href="/admin">Admin: games &amp; users</a>.</p>
+<p class="muted small">Edit names, emails and admin rights under <a href="/admin/users">Admin: People</a>.</p>
 
 <style>
 	.player { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tv } from '#lib/colors.ts';
 	import { pts, plural } from '#lib/format.ts';
 	let { data, form } = $props();
 	const a = $derived(data.award);
@@ -28,7 +29,7 @@
 		{#if g.name}<h2 style="margin-top:16px">{g.name}</h2>{/if}
 		<div class="photos big">
 			{#each g.photos as p}
-				<label class="pick" class:won={p.won} class:ours={open && p.ours} style="--team:{p.color}">
+				<label class="pick" class:won={p.won} class:ours={open && p.ours} style="{tv(p.color)}">
 					{#if open && !p.ours}<input type="checkbox" name="pick" value={p.id} checked={p.picked} />{/if}
 					<img src="/media/{p.id}/thumb" alt={p.caption || p.category} loading="lazy" />
 					<span class="mark">✓</span>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tv } from '#lib/colors.ts';
 	import { enhance } from '$app/forms';
 	import { pts, plural } from '#lib/format.ts';
 	let { data, form } = $props();
@@ -100,7 +101,7 @@
 		<label class="check small" style="margin:8px 0"><input type="checkbox" bind:checked={allTeams} /> Show every team's photos</label>
 		<div class="photos">
 			{#each pickable as p (p.id)}
-				<label class="ph" style="--team:{p.color};cursor:pointer" class:sel={picked.includes(p.id)} title={p.category}>
+				<label class="ph" style="{tv(p.color)};cursor:pointer" class:sel={picked.includes(p.id)} title={p.category}>
 					<input type="checkbox" name="photos" value={p.id} bind:group={picked} hidden />
 					<img src="/media/{p.id}/thumb" alt={p.category} loading="lazy" />
 					{#if picked.includes(p.id)}<span class="tag">✓ attached</span>{/if}
@@ -116,7 +117,7 @@
 </form>
 
 {#each data.grants as g}
-	<div class="card spread" style="--team:{g.color}">
+	<div class="card spread" style="{tv(g.color)}">
 		<div class="grow">
 			<strong>🏅 {g.title}</strong> <span class="pill">{g.points >= 0 ? '+' : ''}{pts(g.points)}</span>
 			<div class="small"><span class="pill team">{g.who ? `${g.who} · ` : ''}{g.team}</span>
