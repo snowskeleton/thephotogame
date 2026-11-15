@@ -31,7 +31,7 @@
 	<h1>Your account</h1>
 
 	<form method="POST" action="?/name" class="card stack" use:enhance>
-		<label>Name <input name="name" value={data.user?.name} maxlength="40" required /></label>
+		<label>Name <input name="name" defaultValue={data.user?.name} maxlength="40" required /></label>
 		<p class="muted small">Signed in as {data.user?.email}</p>
 		{#if form?.error}<p class="err">{form.error}</p>{/if}
 		{#if form?.saved}<p class="ok">Saved.</p>{/if}

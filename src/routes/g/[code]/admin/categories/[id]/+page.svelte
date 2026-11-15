@@ -13,10 +13,10 @@
 
 <form method="POST" action="?/save" class="stack">
 	<div class="card stack">
-		<label>Name <input name="name" value={c.name} required maxlength="80" /></label>
+		<label>Name <input name="name" defaultValue={c.name} required maxlength="80" /></label>
 		<label>Rules and details <textarea name="rules">{c.rules}</textarea></label>
 		<label>Other notes <textarea name="notes" style="min-height:56px">{c.notes}</textarea></label>
-		<label>Day or group label (optional) <input name="day_label" value={c.day_label} maxlength="40" placeholder="e.g. Day 2" /></label>
+		<label>Day or group label (optional) <input name="day_label" defaultValue={c.day_label} maxlength="40" placeholder="e.g. Day 2" /></label>
 		<label class="check"><input type="checkbox" name="active" checked={!!c.active} /> Show on the board</label>
 	</div>
 
@@ -43,7 +43,7 @@
 			<button type="button" class="sm" onclick={() => add('extra')}>+ Extra</button>
 		</div>
 		<label>How many photos per team can score here? (empty for no limit)
-			<input name="scoring_cap" type="number" min="1" value={c.scoring_cap ?? ''} /></label>
+			<input name="scoring_cap" type="number" min="1" defaultValue={c.scoring_cap ?? ''} /></label>
 		<p class="muted small" style="margin:0">With a limit, a team's highest-scoring photos count. All photos can still win votes.</p>
 	</div>
 

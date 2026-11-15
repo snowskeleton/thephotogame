@@ -34,8 +34,8 @@
 </div>
 
 <form method="POST" action="?/save" class="card stack" use:enhance>
-	<label>Name <input name="name" value={g.name} required maxlength="80" /></label>
-	<label>Join code <input name="code" value={g.code} required maxlength="20" autocapitalize="characters" /></label>
+	<label>Name <input name="name" defaultValue={g.name} required maxlength="80" /></label>
+	<label>Join code <input name="code" defaultValue={g.code} required maxlength="20" autocapitalize="characters" /></label>
 
 	<label>Who can see photos?
 		<select name="visibility">
@@ -53,20 +53,20 @@
 		</select>
 	</label>
 	<label>Max team size (empty for no limit)
-		<input name="max_team_size" type="number" min="1" value={g.max_team_size ?? ''} /></label>
+		<input name="max_team_size" type="number" min="1" defaultValue={g.max_team_size ?? ''} /></label>
 	<p class="muted small" style="margin:0">Players can't join a full team. You still can add more; it's just flagged as oversized.</p>
 
 	<hr />
 	<label>Doubts allowed before a photo goes to review
-		<input name="doubt_limit" type="number" min="0" value={g.doubt_limit} /></label>
+		<input name="doubt_limit" type="number" min="0" defaultValue={g.doubt_limit} /></label>
 	<p class="muted small" style="margin:0">With 2, a photo goes under review when a third player doubts it.</p>
 
 	<hr />
 	<label class="check"><input type="checkbox" name="bingo" bind:checked={bingo} /> Bingo board with bonus points</label>
 	{#if bingo}
-		<label>Columns on the board <input name="bingo_cols" type="number" min="2" max="8" value={g.bingo_cols} /></label>
-		<label>Points per completed line <input name="bingo_line_points" inputmode="decimal" value={g.bingo_line_points} /></label>
-		<label>Points for the whole board <input name="bingo_board_points" inputmode="decimal" value={g.bingo_board_points} /></label>
+		<label>Columns on the board <input name="bingo_cols" type="number" min="2" max="8" defaultValue={g.bingo_cols} /></label>
+		<label>Points per completed line <input name="bingo_line_points" inputmode="decimal" defaultValue={g.bingo_line_points} /></label>
+		<label>Points for the whole board <input name="bingo_board_points" inputmode="decimal" defaultValue={g.bingo_board_points} /></label>
 		<p class="muted small" style="margin:0">Lines are full rows and columns, plus diagonals when the board is a perfect square. Board order follows the category order.</p>
 	{:else}
 		<input type="hidden" name="bingo_cols" value={g.bingo_cols} />

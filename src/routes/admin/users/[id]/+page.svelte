@@ -30,8 +30,8 @@
 	{#if form?.error}<p class="err">{form.error}</p>{/if}
 
 	<form method="POST" action="?/save" class="card stack" use:enhance>
-		<label>Name <input name="name" value={u.name} required maxlength="40" /></label>
-		<label>Email <input name="email" type="email" value={u.email} required /></label>
+		<label>Name <input name="name" defaultValue={u.name} required maxlength="40" /></label>
+		<label>Email <input name="email" type="email" defaultValue={u.email} required /></label>
 		<label class="check">
 			<input type="checkbox" name="is_admin" checked={!!u.is_admin} disabled={data.isMe} />
 			Admin (can run every game and manage people)

@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { passkeySignIn } from '#lib/passkey.ts';
 	let { data, form } = $props();
+	// Starting values are fixed when the page loads. Tying them to page state made Svelte write them
+	// back into the fields on every redraw, wiping whatever had been typed or autofilled.
+	const start = { name: form?.name ?? '', email: form?.email ?? '' };
 	let busy = $state(false);
 	let checked = false;
 
@@ -31,13 +34,13 @@
 	<p class="muted">You're invited to</p>
 	<h1>{data.game.name}</h1>
 	<form method="POST" class="card stack" onsubmit={submit}>
-		<label>Your name <input name="name" value={form?.name ?? ''} autocomplete="name" autocapitalize="words" required maxlength="40" /></label>
+		<label>Your name <input name="name" defaultValue={start.name} autocomplete="name" autocapitalize="words" required maxlength="40" /></label>
 		<label>
 			Email
 			<input
 				name="email"
 				type="email"
-				value={form?.email ?? ''}
+				defaultValue={start.email}
 				autocomplete="email"
 				inputmode="email"
 				autocapitalize="none"

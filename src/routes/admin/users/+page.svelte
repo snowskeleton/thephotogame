@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { plural } from '#lib/format.ts';
 	let { data, form } = $props();
+	// Fixed at load so redraws (searching, filtering) can't wipe a half-typed form.
+	const start = { name: form?.name ?? '', email: form?.email ?? '' };
 	let q = $state('');
 	let show = $state<'all' | 'admins' | 'new'>('all');
 
@@ -31,8 +33,8 @@
 	<details class="card" open={!!form?.error && !form?.report}>
 		<summary>Add a person</summary>
 		<form method="POST" action="?/add" class="stack" style="margin-top:12px">
-			<label>Name <input name="name" value={form?.name ?? ''} required maxlength="40" autocomplete="off" /></label>
-			<label>Email <input name="email" type="email" value={form?.email ?? ''} required autocomplete="off" /></label>
+			<label>Name <input name="name" defaultValue={start.name} required maxlength="40" autocomplete="off" /></label>
+			<label>Email <input name="email" type="email" defaultValue={start.email} required autocomplete="off" /></label>
 			<label class="check"><input type="checkbox" name="is_admin" /> Admin (can run every game and manage people)</label>
 			{#if data.games.length}
 				<label>

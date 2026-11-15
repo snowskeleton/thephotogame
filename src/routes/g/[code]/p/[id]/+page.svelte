@@ -72,7 +72,7 @@
 		<summary>Edit claim or caption</summary>
 		<form method="POST" action="?/claims" class="stack" style="margin-top:12px" use:enhance>
 			<ClaimFields options={data.options} claims={data.claims} />
-			<label>Caption <input name="caption" maxlength="200" value={p.caption} /></label>
+			<label>Caption <input name="caption" maxlength="200" defaultValue={p.caption} /></label>
 			{#if form?.saved}<p class="ok">Saved.</p>{/if}
 			<button class="primary">Save</button>
 		</form>
@@ -92,7 +92,7 @@
 		</form>
 		<form method="POST" action="?/adjust" class="stack" use:enhance>
 			<label>Set points yourself (leave empty to use the claim)
-				<input name="points" inputmode="decimal" value={data.override ?? ''} placeholder={pts(data.score.claimed)} /></label>
+				<input name="points" inputmode="decimal" defaultValue={data.override ?? ''} placeholder={pts(data.score.claimed)} /></label>
 			<label>Category
 				<select name="category">
 					{#each data.categories as c}<option value={c.id} selected={c.id === p.category_id}>{c.name}</option>{/each}

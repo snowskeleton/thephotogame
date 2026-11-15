@@ -48,8 +48,12 @@ Goal: it just works, and everyone has a unique email on file.
 5. After signing in with a code, a link or a fresh join, the next page offers
    to save a passkey on that device ("Not now" stops it asking for 30 days).
 
-Sign-in fields are plain form fields read at submit time, never bound to
-script state, so browser autofill and password managers can't be overwritten.
+Typed-in fields use `defaultValue={...}`, not `value={...}`. After hydration
+Svelte writes a `value={...}` back into the field whenever anything in the
+same component redraws (a button label changing to "Joining…" was enough),
+which wiped what the person had typed or autofilled. `defaultValue` renders
+the same on the server and is never written over the current value. Fields
+are read from the form at submit time.
 
 ## Team colors
 

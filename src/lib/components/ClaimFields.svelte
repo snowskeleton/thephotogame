@@ -25,7 +25,7 @@
 		<legend>Extras</legend>
 		{#each extras as o}
 			<label class="check">
-				<input type="number" name="extra_{o.id}" min="0" max="99" step="1" inputmode="numeric" value={has(o.id)?.qty ?? 0} style="width:72px" />
+				<input type="number" name="extra_{o.id}" min="0" max="99" step="1" inputmode="numeric" defaultValue={has(o.id)?.qty ?? 0} style="width:72px" />
 				<span class="grow">{o.label}</span><span class="pill">+{pts(o.points)} each</span>
 			</label>
 		{/each}
