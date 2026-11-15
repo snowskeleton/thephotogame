@@ -25,7 +25,7 @@
 	</div>
 {/if}
 
-{#each data.teams as t}
+{#each data.teams as t (t.id)}
 	<details class="card" style="{tv(t.color)};border-left:8px solid var(--team)">
 		<summary>
 			{t.name}
@@ -34,7 +34,7 @@
 		</summary>
 		<form method="POST" action="?/saveTeam" class="stack" style="margin-top:12px" use:enhance>
 			<input type="hidden" name="id" value={t.id} />
-			<label>Name <input name="name" value={t.name} required maxlength="40" /></label>
+			<label>Name <input name="name" defaultValue={t.name} required maxlength="40" /></label>
 			<ColorPicker value={t.color} taken={data.teams.map((x) => x.color)} />
 			<button>Save team</button>
 		</form>
@@ -56,7 +56,7 @@
 
 <h2 style="margin-top:20px">Players {#if unassigned}<span class="pill warn">{unassigned} without a team</span>{/if}</h2>
 <div class="card" style="padding:4px 12px">
-	{#each data.players as p}
+	{#each data.players as p (p.id)}
 		<div class="player">
 			<div class="grow">
 				<strong>{p.name}</strong>

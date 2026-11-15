@@ -17,7 +17,7 @@
 <h2>Voted awards</h2>
 <p class="muted small">Players vote for as many photos as they like. When you close voting, the photo with the most votes wins the points for its team (ties all win).</p>
 
-{#each data.awards as a}
+{#each data.awards as a (a.id)}
 	<div class="card stack">
 		<div class="spread">
 			<strong>{a.name}</strong>
@@ -37,9 +37,9 @@
 			<summary class="small">Edit</summary>
 			<form method="POST" action="?/saveAward" class="stack" style="margin-top:10px" use:enhance>
 				<input type="hidden" name="id" value={a.id} />
-				<label>Name <input name="name" value={a.name} required maxlength="80" /></label>
-				<label>Description <input name="description" value={a.description} maxlength="400" /></label>
-				<label>Bonus points <input name="points" inputmode="decimal" value={a.points} /></label>
+				<label>Name <input name="name" defaultValue={a.name} required maxlength="80" /></label>
+				<label>Description <input name="description" defaultValue={a.description} maxlength="400" /></label>
+				<label>Bonus points <input name="points" inputmode="decimal" defaultValue={a.points} /></label>
 				<label>Winners
 					<select name="scope">
 						<option value="game" selected={a.scope === 'game'}>One winner across all photos</option>
@@ -116,7 +116,7 @@
 	<button class="primary">Give award</button>
 </form>
 
-{#each data.grants as g}
+{#each data.grants as g (g.id)}
 	<div class="card spread" style="{tv(g.color)}">
 		<div class="grow">
 			<strong>🏅 {g.title}</strong> <span class="pill">{g.points >= 0 ? '+' : ''}{pts(g.points)}</span>
