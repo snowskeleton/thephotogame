@@ -21,17 +21,17 @@ export type Game = {
 export type Team = { id: number; game_id: number; name: string; color: string };
 export type Viewer = { user: User; teamId: number | null; isAdmin: boolean };
 
-export function gameByCode(code: string): Game {
-	const g = get<Game>('SELECT * FROM game WHERE code = ?', code);
+export async function gameByCode(code: string): Promise<Game> {
+	const g = await get<Game>('SELECT * FROM game WHERE code = ?', code);
 	if (!g) error(404, 'No game with that code');
 	return g;
 }
 
 /** Loads the game and the signed-in player's place in it; sends strangers to the join page. */
-export function enter(locals: App.Locals, code: string, path: string): { game: Game; viewer: Viewer } {
-	const game = gameByCode(code);
+export async function enter(locals: App.Locals, code: string): Promise<{ game: Game; viewer: Viewer }> {
+	const game = await gameByCode(code);
 	if (!locals.user) redirect(303, `/join/${game.code}`);
-	const m = get<{ team_id: number | null }>(
+	const m = await get<{ team_id: number | null }>(
 		'SELECT team_id FROM member WHERE game_id = ? AND user_id = ?',
 		game.id,
 		locals.user.id

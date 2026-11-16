@@ -1,8 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
-import { cleanEmail, createUser, findUserByEmail, safeNext, sendCode } from '#lib/server/auth.ts';
-import { get } from '#lib/server/db.ts';
+import { cleanEmail, createUser, findUserByEmail, isFirstAdmin, safeNext, sendCode } from '#lib/server/auth.ts';
 
-export const load = ({ locals, url }) => {
+export const load = async ({ locals, url }) => {
 	const next = safeNext(url.searchParams.get('next'));
 	if (locals.user) redirect(303, next);
 	return { next, email: cleanEmail(url.searchParams.get('email')) ?? '' };
@@ -15,16 +14,14 @@ export const actions = {
 		const next = safeNext(f.get('next'));
 		const typed = String(f.get('email') ?? '');
 		if (!email) return fail(400, { error: 'That email doesn’t look right.', email: typed });
-		if (!findUserByEmail(email)) {
+		if (!await findUserByEmail(email)) {
 			// Bootstrap: the admin has no join link to sign up through, so their account is made here.
-			const adminEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
-			const isFirstAdmin = adminEmail ? email === adminEmail : !get('SELECT 1 FROM user LIMIT 1');
-			if (!isFirstAdmin)
+			if (!(await isFirstAdmin(email)))
 				return fail(400, {
 					error: 'No player has that email yet. Open your game’s join link to sign up.',
 					email: typed
 				});
-			createUser(email, email.split('@')[0]);
+			await createUser(email, email.split('@')[0]);
 		}
 		await sendCode(email, url.origin);
 		redirect(303, `/login/code?email=${encodeURIComponent(email)}&next=${encodeURIComponent(next)}`);

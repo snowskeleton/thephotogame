@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomInt } from 'node:crypto';
 import type { Cookies } from '@sveltejs/kit';
-import { get, insert, now, run } from './db.ts';
+import { config, get, insert, now, run } from './db.ts';
 import { sendMail } from './mail.ts';
 
 const SESSION_DAYS = 180;
@@ -9,9 +9,9 @@ const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 
 export type User = { id: number; email: string; name: string; is_admin: number };
 
-export function userFromToken(token: string | undefined): User | null {
+export async function userFromToken(token: string | undefined): Promise<User | null> {
 	if (!token) return null;
-	const row = get<User & { expires_at: number }>(
+	const row = await get<User & { expires_at: number }>(
 		`SELECT u.id, u.email, u.name, u.is_admin, s.expires_at
 		 FROM session s JOIN user u ON u.id = s.user_id WHERE s.token = ?`,
 		sha(token)
@@ -20,10 +20,10 @@ export function userFromToken(token: string | undefined): User | null {
 	return { id: row.id, email: row.email, name: row.name, is_admin: row.is_admin };
 }
 
-export function startSession(cookies: Cookies, userId: number) {
+export async function startSession(cookies: Cookies, userId: number) {
 	const token = randomBytes(32).toString('base64url');
 	const expires = now() + SESSION_DAYS * 86400_000;
-	run('INSERT INTO session (token, user_id, expires_at) VALUES (?, ?, ?)', sha(token), userId, expires);
+	await run('INSERT INTO session (token, user_id, expires_at) VALUES (?, ?, ?)', sha(token), userId, expires);
 	cookies.set(COOKIE, token, {
 		path: '/',
 		httpOnly: true,
@@ -32,9 +32,9 @@ export function startSession(cookies: Cookies, userId: number) {
 	});
 }
 
-export function endSession(cookies: Cookies) {
+export async function endSession(cookies: Cookies) {
 	const token = cookies.get(COOKIE);
-	if (token) run('DELETE FROM session WHERE token = ?', sha(token));
+	if (token) await run('DELETE FROM session WHERE token = ?', sha(token));
 	cookies.delete(COOKIE, { path: '/' });
 }
 
@@ -43,14 +43,18 @@ export function cleanEmail(v: unknown): string | null {
 	return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && e.length < 200 ? e : null;
 }
 
-export function findUserByEmail(email: string) {
+export async function findUserByEmail(email: string) {
 	return get<User>('SELECT id, email, name, is_admin FROM user WHERE email = ?', email);
 }
 
-export function createUser(email: string, name: string): number {
-	const adminEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
-	const first = !get('SELECT 1 FROM user LIMIT 1');
-	const isAdmin = adminEmail ? email === adminEmail : first;
+/** Whether this email gets admin rights on sign-up: ADMIN_EMAIL, or else whoever signs up first. */
+export async function isFirstAdmin(email: string) {
+	const adminEmail = (config().ADMIN_EMAIL || '').trim().toLowerCase();
+	return adminEmail ? email === adminEmail : !(await get('SELECT 1 FROM user LIMIT 1'));
+}
+
+export async function createUser(email: string, name: string): Promise<number> {
+	const isAdmin = await isFirstAdmin(email);
 	return insert(
 		'INSERT INTO user (email, name, is_admin, created_at) VALUES (?, ?, ?, ?)',
 		email,
@@ -63,8 +67,8 @@ export function createUser(email: string, name: string): number {
 /** Emails a six-digit sign-in code. `name` is kept so a brand new account can be created on verify. */
 export async function sendCode(email: string, origin: string, name?: string) {
 	const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
-	run('DELETE FROM login_code WHERE email = ? OR expires_at < ?', email, now());
-	run(
+	await run('DELETE FROM login_code WHERE email = ? OR expires_at < ?', email, now());
+	await run(
 		'INSERT INTO login_code (email, code_hash, name, expires_at) VALUES (?, ?, ?, ?)',
 		email,
 		sha(code),
@@ -78,25 +82,25 @@ export async function sendCode(email: string, origin: string, name?: string) {
 	);
 }
 
-export function checkCode(email: string, code: string): { ok: boolean; name: string | null } {
-	const row = get<{ id: number; code_hash: string; name: string | null; expires_at: number; attempts: number }>(
+export async function checkCode(email: string, code: string): Promise<{ ok: boolean; name: string | null }> {
+	const row = await get<{ id: number; code_hash: string; name: string | null; expires_at: number; attempts: number }>(
 		'SELECT * FROM login_code WHERE email = ?',
 		email
 	);
 	if (!row || row.expires_at < now() || row.attempts >= 6) return { ok: false, name: null };
 	if (row.code_hash !== sha(code.replace(/\D/g, ''))) {
-		run('UPDATE login_code SET attempts = attempts + 1 WHERE id = ?', row.id);
+		await run('UPDATE login_code SET attempts = attempts + 1 WHERE id = ?', row.id);
 		return { ok: false, name: null };
 	}
-	run('DELETE FROM login_code WHERE id = ?', row.id);
+	await run('DELETE FROM login_code WHERE id = ?', row.id);
 	return { ok: true, name: row.name };
 }
 
 /** One-time sign-in token, used for QR hand-off and admin-made sign-in links. */
-export function makeHandoff(userId: number, minutes: number): string {
+export async function makeHandoff(userId: number, minutes: number): Promise<string> {
 	const token = randomBytes(24).toString('base64url');
-	run('DELETE FROM handoff WHERE expires_at < ?', now());
-	run(
+	await run('DELETE FROM handoff WHERE expires_at < ?', now());
+	await run(
 		'INSERT INTO handoff (token_hash, user_id, expires_at) VALUES (?, ?, ?)',
 		sha(token),
 		userId,
@@ -105,13 +109,13 @@ export function makeHandoff(userId: number, minutes: number): string {
 	return token;
 }
 
-export function useHandoff(token: string): number | null {
-	const row = get<{ user_id: number; expires_at: number }>(
+export async function useHandoff(token: string): Promise<number | null> {
+	const row = await get<{ user_id: number; expires_at: number }>(
 		'SELECT user_id, expires_at FROM handoff WHERE token_hash = ?',
 		sha(token)
 	);
 	if (!row) return null;
-	run('DELETE FROM handoff WHERE token_hash = ?', sha(token));
+	await run('DELETE FROM handoff WHERE token_hash = ?', sha(token));
 	return row.expires_at < now() ? null : row.user_id;
 }
 
@@ -122,7 +126,7 @@ export async function sendInvite(
 	from: string,
 	game?: { code: string; name: string }
 ) {
-	const link = `${origin}/link/${makeHandoff(user.id, 7 * 24 * 60)}${game ? `?next=/g/${game.code}` : ''}`;
+	const link = `${origin}/link/${await makeHandoff(user.id, 7 * 24 * 60)}${game ? `?next=/g/${game.code}` : ''}`;
 	await sendMail(
 		user.email,
 		game ? `You're in: ${game.name}` : 'Your Photo Game sign-in link',

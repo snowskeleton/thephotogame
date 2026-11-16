@@ -9,19 +9,19 @@ import { savePhotos } from '#lib/server/uploads.ts';
 type Category = {
 	id: number; name: string; rules: string; notes: string; day_label: string; scoring_cap: number | null; active: number;
 };
-const find = (gameId: number, id: string) => {
-	const c = get<Category>('SELECT * FROM category WHERE id = ? AND game_id = ?', Number(id), gameId);
+const find = async (gameId: number, id: string) => {
+	const c = await get<Category>('SELECT * FROM category WHERE id = ? AND game_id = ?', Number(id), gameId);
 	if (!c) error(404, 'No such category');
 	return c;
 };
 
-export const load = ({ params, locals, url }) => {
-	const { game, viewer } = enter(locals, params.code, url.pathname);
-	const category = find(game.id, params.id);
-	const scores = scoreGame(game).photoScores;
-	const photos = listPhotos(game, viewer, { cat: category.id }).map((p) => ({ ...p, score: scores.get(p.id)! }));
+export const load = async ({ params, locals, url }) => {
+	const { game, viewer } = await enter(locals, params.code);
+	const category = await find(game.id, params.id);
+	const scores = (await scoreGame(game)).photoScores;
+	const photos = (await listPhotos(game, viewer, { cat: category.id })).map((p) => ({ ...p, score: scores.get(p.id)! }));
 	const ours = photos.filter((p) => p.team_id === viewer.teamId);
-	const claims = all<{ photo_id: number; option_id: number; qty: number }>(
+	const claims = await all<{ photo_id: number; option_id: number; qty: number }>(
 		`SELECT c.photo_id, c.option_id, c.qty FROM photo_claim c JOIN photo p ON p.id = c.photo_id
 		 WHERE p.category_id = ? AND p.team_id = ?`,
 		category.id,
@@ -29,10 +29,10 @@ export const load = ({ params, locals, url }) => {
 	);
 	return {
 		category,
-		options: optionsFor(category.id),
+		options: await optionsFor(category.id),
 		ours: ours.map((p) => ({ ...p, claims: claims.filter((c) => c.photo_id === p.id) })),
 		theirs: photos.filter((p) => p.team_id !== viewer.teamId),
-		categories: all<{ id: number; name: string }>(
+		categories: await all<{ id: number; name: string }>(
 			'SELECT id, name FROM category WHERE game_id = ? AND (active = 1 OR ? OR id = ?) ORDER BY sort, id',
 			game.id,
 			viewer.isAdmin ? 1 : 0,
@@ -43,7 +43,7 @@ export const load = ({ params, locals, url }) => {
 
 export const actions = {
 	default: async ({ request, params, locals, url }) => {
-		const { game, viewer } = enter(locals, params.code, url.pathname);
-		return savePhotos(game, viewer, await request.formData(), find(game.id, params.id));
+		const { game, viewer } = await enter(locals, params.code);
+		return await savePhotos(game, viewer, await request.formData(), await find(game.id, params.id));
 	}
 };

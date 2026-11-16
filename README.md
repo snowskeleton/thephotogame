@@ -4,29 +4,46 @@ A mobile website for a family photo scavenger hunt: categories, teams, a bingo
 board, nightly reveal, approval voting, awards and a leaderboard. See
 [DESIGN.md](DESIGN.md) for how the game works.
 
-## Run it
+It runs on Cloudflare Workers, with D1 for the database and R2 for the photos.
+All of it fits the free plan for a family-sized game.
+
+## Deploy
+
+One-time setup (needs a Cloudflare account; `npx wrangler login` first):
 
 ```bash
-cp .env.example .env    # then edit it
-docker compose up -d --build
+npm install
+npx wrangler d1 create thephotogame        # copy the database_id it prints into wrangler.jsonc
+npx wrangler r2 bucket create thephotogame-photos
+npm run db:migrate:remote
 ```
 
-The app listens on `127.0.0.1:3000` unless `BIND` in `.env` says otherwise. Everything it stores (the SQLite database
-and all photos) lives in `./data`; back up that folder.
+Then edit `vars` in `wrangler.jsonc`:
 
-Caddy:
+- `ADMIN_EMAIL`: this account becomes the admin when it first signs in. If empty,
+  the very first account created is the admin.
+- `TIME_ZONE`: used for grouping photos by day.
+- `MAIL_FROM`: the sender for sign-in codes and invites.
 
+Email goes out through [Resend](https://resend.com) (its free tier is plenty).
+Verify your sending domain there, then:
+
+```bash
+npx wrangler secret put RESEND_API_KEY
 ```
-photos.example.com {
-	request_body {
-		max_size 250MB
-	}
-	reverse_proxy 127.0.0.1:3000
-}
+
+Without that key, sign-in codes are only printed to the Worker's log
+(`npx wrangler tail`).
+
+Deploy, and again after every change:
+
+```bash
+npm run deploy
 ```
 
-`ORIGIN` must match the public URL exactly. The container runs as the `node`
-user (uid 1000), so `./data` must be writable by it: `mkdir data && sudo chown 1000:1000 data`.
+The site comes up on `thephotogame.<you>.workers.dev`. To use your own domain,
+add it under the Worker's **Settings → Domains & Routes** in the Cloudflare
+dashboard.
 
 ## First use
 
@@ -40,7 +57,24 @@ user (uid 1000), so `./data` must be writable by it: `mkdir data && sudo chown 1
 
 ```bash
 npm install
+npm run db:migrate     # creates the local database in .wrangler/
 npm run dev
 ```
 
-Needs Node 24+. Without `SMTP_HOST`, sign-in codes are printed to the console.
+`npm run dev` uses local copies of D1 and R2 kept in `.wrangler/`. Sign-in codes
+are printed to the console. `npm run preview` builds the app and runs it in
+`workerd`, Cloudflare's actual runtime, which is the closer check before deploying.
+
+Schema changes go in a new file in `migrations/` (`npx wrangler d1 migrations
+create thephotogame <name>`). Apply it with `npm run db:migrate` locally and
+`npm run db:migrate:remote` in production.
+
+## Backups
+
+```bash
+npx wrangler d1 export thephotogame --remote --output backup.sql
+```
+
+D1 can also restore the database to any minute in the last 7 days on the free
+plan, 30 on paid (`npx wrangler d1 time-travel`). Photos stay in the R2 bucket; the admin's
+**Download all** button saves every original as a zip.

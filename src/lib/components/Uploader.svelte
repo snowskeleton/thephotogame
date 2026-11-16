@@ -2,6 +2,7 @@
 	import { deserialize } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import { plural } from '#lib/format.ts';
+	import { prepare } from '#lib/resize.ts';
 	import type { Snippet } from 'svelte';
 
 	let {
@@ -36,7 +37,8 @@
 	}
 
 	// One request per photo: a phone's camera roll can be hundreds of MB, and this way one bad
-	// file or a dropped connection only costs that photo.
+	// file or a dropped connection only costs that photo. The phone makes the thumbnail and the
+	// screen-sized copy itself; the server only stores them.
 	async function onsubmit(e: SubmitEvent) {
 		e.preventDefault();
 		const files = [...(input.files ?? [])];
@@ -53,6 +55,16 @@
 			for (const [k, v] of base) fd.append(k, v);
 			fd.append('photo', file);
 			try {
+				const made = await prepare(file).catch(() => null);
+				if (!made) {
+					errors.push(`“${file.name}” isn’t a photo this phone can read. Try a JPEG or PNG.`);
+					done++;
+					continue;
+				}
+				fd.append('thumb', made.thumb, 'thumb.jpg');
+				fd.append('large', made.large, 'large.jpg');
+				fd.append('width', String(made.width));
+				fd.append('height', String(made.height));
 				const res = await fetch(formEl.action, {
 					method: 'POST',
 					body: fd,
@@ -86,8 +98,8 @@
 	{@render fields?.()}
 	{#if added && !busy}<p class="ok" style="margin:0">{plural(added, 'photo')} added.</p>{/if}
 	{#each errors as err}<p class="err" style="margin:0">{err}</p>{/each}
-	{#if !auto}<button class="primary" disabled={busy || !picked}>{busy ? 'Uploading…' : 'Submit'}</button>
-	{:else}<noscript><button class="primary">Upload</button></noscript>{/if}
+	{#if !auto}<button class="primary" disabled={busy || !picked}>{busy ? 'Uploading…' : 'Submit'}</button>{/if}
+	<noscript><p class="err" style="margin:0">Uploading photos needs JavaScript turned on.</p></noscript>
 </form>
 
 <style>

@@ -4,13 +4,13 @@ import { all, get, run } from '#lib/server/db.ts';
 import { requireAdmin, str } from '#lib/server/game.ts';
 import { mailReady } from '#lib/server/mail.ts';
 
-export const load = ({ locals }) => {
+export const load = async ({ locals }) => {
 	const me = requireAdmin(locals);
 	return {
 		me: me.id,
-		mailReady,
-		games: all<{ id: number; name: string }>('SELECT id, name FROM game ORDER BY created_at DESC'),
-		users: all<{
+		mailReady: mailReady(),
+		games: await all<{ id: number; name: string }>('SELECT id, name FROM game ORDER BY created_at DESC'),
+		users: await all<{
 			id: number;
 			name: string;
 			email: string;
@@ -29,8 +29,8 @@ export const load = ({ locals }) => {
 	};
 };
 
-const gameById = (v: unknown) =>
-	get<{ id: number; code: string; name: string }>('SELECT id, code, name FROM game WHERE id = ?', Number(v) || 0);
+const gameById = async (v: unknown) =>
+	await get<{ id: number; code: string; name: string }>('SELECT id, code, name FROM game WHERE id = ?', Number(v) || 0);
 
 /** "Ada Lovelace, ada@example.com", "Ada <ada@example.com>" or just an email. */
 function parseLine(line: string): { name: string; email: string } | null {
@@ -49,12 +49,12 @@ export const actions = {
 		const email = cleanEmail(f.get('email'));
 		const back = { name, email: String(f.get('email') ?? '') };
 		if (!name || !email) return fail(400, { error: 'A person needs a name and a valid email.', existing: 0, ...back });
-		const existing = findUserByEmail(email);
+		const existing = await findUserByEmail(email);
 		if (existing) return fail(400, { error: `${existing.name} already has that email.`, existing: existing.id, ...back });
-		const game = gameById(f.get('game'));
-		const id = createUser(email, name);
-		if (f.get('is_admin')) run('UPDATE user SET is_admin = 1 WHERE id = ?', id);
-		if (game) run('INSERT OR IGNORE INTO member (game_id, user_id) VALUES (?, ?)', game.id, id);
+		const game = await gameById(f.get('game'));
+		const id = await createUser(email, name);
+		if (f.get('is_admin')) await run('UPDATE user SET is_admin = 1 WHERE id = ?', id);
+		if (game) await run('INSERT OR IGNORE INTO member (game_id, user_id) VALUES (?, ?)', game.id, id);
 		let sent = '';
 		if (f.get('invite')) {
 			try {
@@ -69,7 +69,7 @@ export const actions = {
 	addMany: async ({ request, locals, url }) => {
 		const me = requireAdmin(locals);
 		const f = await request.formData();
-		const game = gameById(f.get('game'));
+		const game = await gameById(f.get('game'));
 		const invite = !!f.get('invite');
 		const lines = String(f.get('list') ?? '').split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 200);
 		const report = { added: [] as string[], already: [] as string[], bad: [] as string[], mailFailed: [] as string[] };
@@ -79,9 +79,9 @@ export const actions = {
 				report.bad.push(line.slice(0, 80));
 				continue;
 			}
-			const existing = findUserByEmail(p.email);
-			const id = existing?.id ?? createUser(p.email, p.name);
-			if (game) run('INSERT OR IGNORE INTO member (game_id, user_id) VALUES (?, ?)', game.id, id);
+			const existing = await findUserByEmail(p.email);
+			const id = existing?.id ?? await createUser(p.email, p.name);
+			if (game) await run('INSERT OR IGNORE INTO member (game_id, user_id) VALUES (?, ?)', game.id, id);
 			if (existing) {
 				report.already.push(existing.name);
 				continue;

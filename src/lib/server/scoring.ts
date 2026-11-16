@@ -47,17 +47,17 @@ export function bingoLines(n: number, cols: number): number[][] {
 	return lines;
 }
 
-export function scoreGame(game: Game) {
-	const teams = all<{ id: number; name: string; color: string; members: number }>(
+export async function scoreGame(game: Game) {
+	const teams = await all<{ id: number; name: string; color: string; members: number }>(
 		`SELECT t.*, (SELECT COUNT(*) FROM member m WHERE m.team_id = t.id) AS members
 		 FROM team t WHERE t.game_id = ? ORDER BY t.id`,
 		game.id
 	);
-	const cats = all<{ id: number; scoring_cap: number | null }>(
+	const cats = await all<{ id: number; scoring_cap: number | null }>(
 		'SELECT id, scoring_cap FROM category WHERE game_id = ? AND active = 1 ORDER BY sort, id',
 		game.id
 	);
-	const photos = all<{
+	const photos = await all<{
 		id: number;
 		category_id: number;
 		team_id: number;
@@ -111,20 +111,21 @@ export function scoreGame(game: Game) {
 	}
 
 	// Voted awards: results only exist once voting is closed.
-	const awards = all<{ id: number; points: number; scope: string }>(
+	const awards = await all<{ id: number; points: number; scope: string }>(
 		`SELECT id, points, scope FROM award WHERE game_id = ? AND status = 'closed'`,
 		game.id
 	);
 	const winners: Winner[] = [];
 	const teamAwardPts = new Map<number, number>();
+	const tallies = await all<{ award_id: number; photo_id: number; team_id: number; category_id: number; votes: number }>(
+		`SELECT v.award_id, v.photo_id, p.team_id, p.category_id, COUNT(*) AS votes
+		 FROM vote v JOIN photo p ON p.id = v.photo_id JOIN award a ON a.id = v.award_id
+		 WHERE a.game_id = ? AND a.status = 'closed' AND p.status != 'disqualified'
+		 GROUP BY v.award_id, v.photo_id`,
+		game.id
+	);
 	for (const a of awards) {
-		const tally = all<{ photo_id: number; team_id: number; category_id: number; votes: number }>(
-			`SELECT v.photo_id, p.team_id, p.category_id, COUNT(*) AS votes
-			 FROM vote v JOIN photo p ON p.id = v.photo_id
-			 WHERE v.award_id = ? AND p.status != 'disqualified'
-			 GROUP BY v.photo_id`,
-			a.id
-		);
+		const tally = tallies.filter((t) => t.award_id === a.id).map(({ award_id, ...t }) => t);
 		const best = new Map<number, number>();
 		for (const t of tally) {
 			const k = a.scope === 'category' ? t.category_id : 0;
@@ -138,7 +139,7 @@ export function scoreGame(game: Game) {
 		}
 	}
 
-	const grants = all<{ team_id: number; user_id: number | null; points: number }>(
+	const grants = await all<{ team_id: number; user_id: number | null; points: number }>(
 		'SELECT team_id, user_id, points FROM grant_award WHERE game_id = ?',
 		game.id
 	);

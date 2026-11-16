@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import { PASSKEY_SKIP, safeNext } from '#lib/server/auth.ts';
 
-export const load = ({ locals, url }) => {
+export const load = async ({ locals, url }) => {
 	const next = safeNext(url.searchParams.get('next'));
 	if (!locals.user) redirect(303, next);
 	return { next };

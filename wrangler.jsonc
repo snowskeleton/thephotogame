@@ -1,0 +1,29 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "thephotogame",
+	"main": ".svelte-kit/cloudflare/_worker.js",
+	"compatibility_date": "2026-11-01",
+	"compatibility_flags": ["nodejs_compat"],
+	"assets": { "binding": "ASSETS", "directory": ".svelte-kit/cloudflare" },
+	"observability": { "enabled": true },
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "thephotogame",
+			// Fill in after `npx wrangler d1 create thephotogame`.
+			"database_id": "00000000-0000-0000-0000-000000000000",
+			"migrations_dir": "migrations"
+		}
+	],
+	"r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "thephotogame-photos" }],
+	"vars": {
+		// The account with this email becomes an admin when it first signs in.
+		// If empty, the very first account created is the admin.
+		"ADMIN_EMAIL": "",
+		// Used for grouping photos by day.
+		"TIME_ZONE": "America/New_York",
+		"MAIL_FROM": "The Photo Game <photogame@example.com>"
+	}
+	// Secret (not here): RESEND_API_KEY, set with `npx wrangler secret put RESEND_API_KEY`.
+	// Without it, sign-in codes are printed to the log.
+}

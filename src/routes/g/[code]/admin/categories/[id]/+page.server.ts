@@ -1,31 +1,31 @@
 import { error, fail, redirect } from '@sveltejs/kit';
-import { all, get, insert, run, tx } from '#lib/server/db.ts';
+import { all, batch, get, q, run } from '#lib/server/db.ts';
 import { gameByCode, intOrNull, num, requireAdmin, str } from '#lib/server/game.ts';
 import { optionsFor } from '#lib/server/claims.ts';
 import { remove } from '#lib/server/images.ts';
 
-const find = (code: string, id: string) => {
-	const game = gameByCode(code);
-	const category = get<{
+const find = async (code: string, id: string) => {
+	const game = await gameByCode(code);
+	const category = await get<{
 		id: number; name: string; rules: string; notes: string; day_label: string; scoring_cap: number | null; active: number;
 	}>('SELECT * FROM category WHERE id = ? AND game_id = ?', Number(id), game.id);
 	if (!category) error(404, 'No such category');
 	return { game, category };
 };
 
-export const load = ({ params }) => {
-	const { category } = find(params.code, params.id);
+export const load = async ({ params }) => {
+	const { category } = await find(params.code, params.id);
 	return {
 		category,
-		options: optionsFor(category.id),
-		photos: get<{ n: number }>('SELECT COUNT(*) AS n FROM photo WHERE category_id = ?', category.id)!.n
+		options: await optionsFor(category.id),
+		photos: (await get<{ n: number }>('SELECT COUNT(*) AS n FROM photo WHERE category_id = ?', category.id))!.n
 	};
 };
 
 export const actions = {
 	save: async ({ request, params, locals }) => {
 		requireAdmin(locals);
-		const { game, category } = find(params.code, params.id);
+		const { game, category } = await find(params.code, params.id);
 		const f = await request.formData();
 		const name = str(f.get('name'), 80);
 		if (!name) return fail(400, { error: 'The category needs a name.' });
@@ -38,8 +38,9 @@ export const actions = {
 		if (!rows.some((r) => r.kind === 'tier'))
 			return fail(400, { error: 'Add at least one base scoring line (not an extra), even if it’s worth 0.' });
 
-		tx(() => {
-			run(
+		const keep = rows.filter((r) => r.id).map((r) => r.id);
+		await batch([
+			q(
 				'UPDATE category SET name = ?, rules = ?, notes = ?, day_label = ?, scoring_cap = ?, active = ? WHERE id = ?',
 				name,
 				str(f.get('rules'), 4000),
@@ -48,31 +49,32 @@ export const actions = {
 				intOrNull(f.get('scoring_cap')),
 				f.get('active') ? 1 : 0,
 				category.id
-			);
-			const keep = rows.filter((r) => r.id).map((r) => r.id);
-			for (const o of all<{ id: number }>('SELECT id FROM score_option WHERE category_id = ?', category.id))
-				if (!keep.includes(o.id)) run('DELETE FROM score_option WHERE id = ?', o.id);
-			rows.forEach((r, i) => {
-				if (r.id)
-					run(
-						'UPDATE score_option SET label = ?, points = ?, kind = ?, sort = ? WHERE id = ? AND category_id = ?',
-						r.label, r.points, r.kind, i, r.id, category.id
-					);
-				else
-					insert(
-						'INSERT INTO score_option (category_id, label, points, kind, sort) VALUES (?, ?, ?, ?, ?)',
-						category.id, r.label, r.points, r.kind, i
-					);
-			});
-		});
+			),
+			q(
+				'DELETE FROM score_option WHERE category_id = ? AND id NOT IN (SELECT value FROM json_each(?))',
+				category.id,
+				JSON.stringify(keep)
+			),
+			...rows.map((r, i) =>
+				r.id
+					? q(
+							'UPDATE score_option SET label = ?, points = ?, kind = ?, sort = ? WHERE id = ? AND category_id = ?',
+							r.label, r.points, r.kind, i, r.id, category.id
+						)
+					: q(
+							'INSERT INTO score_option (category_id, label, points, kind, sort) VALUES (?, ?, ?, ?, ?)',
+							category.id, r.label, r.points, r.kind, i
+						)
+			)
+		]);
 		redirect(303, `/g/${game.code}/admin/categories`);
 	},
 	delete: async ({ params, locals }) => {
 		requireAdmin(locals);
-		const { game, category } = find(params.code, params.id);
-		const ids = all<{ id: number }>('SELECT id FROM photo WHERE category_id = ?', category.id);
-		run('DELETE FROM category WHERE id = ?', category.id);
-		for (const p of ids) await remove(p.id);
+		const { game, category } = await find(params.code, params.id);
+		const ids = await all<{ id: number; ext: string }>('SELECT id, ext FROM photo WHERE category_id = ?', category.id);
+		await run('DELETE FROM category WHERE id = ?', category.id);
+		await remove(ids);
 		redirect(303, `/g/${game.code}/admin/categories`);
 	}
 };

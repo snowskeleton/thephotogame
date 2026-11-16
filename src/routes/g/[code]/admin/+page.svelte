@@ -1,5 +1,6 @@
 <script lang="ts">
 	import CopyLink from '#lib/components/CopyLink.svelte';
+	import DownloadAll from '#lib/components/DownloadAll.svelte';
 	import { enhance } from '$app/forms';
 	import { plural } from '#lib/format.ts';
 	let { data, form } = $props();
@@ -82,7 +83,7 @@
 <div class="card stack">
 	<h2 style="margin:0">Keep the photos</h2>
 	<p class="muted small" style="margin:0">A zip of all {plural(data.stats.photos, 'original photo')}, in a folder per category.</p>
-	<a class="btn" href="/g/{g.code}/admin/download" download>⬇ Download all</a>
+	<DownloadAll code={g.code} />
 </div>
 
 <details class="card">

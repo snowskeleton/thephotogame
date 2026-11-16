@@ -1,1 +1,1 @@
-export const load = ({ locals }) => ({ user: locals.user });
+export const load = async ({ locals }) => ({ user: locals.user });

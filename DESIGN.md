@@ -9,8 +9,8 @@ looks through the day's photos together at night, votes, and wins prizes.
 | Topic | Decision |
 |---|---|
 | Platform | Mobile website (iPhone and Android), Jackbox-style join link |
-| Hosting | Single Docker container behind Caddy, on its own subdomain |
-| Email | Sent through the existing SMTP server |
+| Hosting | Cloudflare Workers (free plan), with D1 for data and R2 for photos |
+| Email | Sent through Resend's HTTP API (Workers can't speak SMTP) |
 | Competitors | Colored teams; a team can be one person. Every photo is credited to the person who took it |
 | Teams | Per game: the admin assigns teams, or players team up themselves. A max team size is shown; admins can exceed it and the team is flagged as oversized |
 | Scoring | Each photo earns points from its category's scoring options, plus voted awards, pencilled-in awards and optional bingo bonuses |
@@ -23,13 +23,17 @@ looks through the day's photos together at night, votes, and wins prizes.
 
 ## Stack
 
-- **SvelteKit** (Node adapter): one process serves pages and API.
-- **SQLite** (Node's built-in driver) in a Docker volume, next to the photo
-  files. Backup = copy one folder.
-- **sharp** makes thumbnails and screen-sized copies; originals are kept.
-- **SimpleWebAuthn** for passkeys, **nodemailer** for email.
-- Configuration by environment variables: `ORIGIN`, `ADMIN_EMAIL`, `SMTP_*`,
-  `DATA_DIR`, `TZ`.
+- **SvelteKit** (Cloudflare adapter): one Worker serves pages and API.
+- **D1** (Cloudflare's SQLite) holds the data; the schema is in `migrations/`.
+  D1 is async and has no BEGIN/COMMIT, so writes that belong together go
+  through `batch()`.
+- **R2** holds the photos: the original plus a thumbnail and a screen-sized JPEG.
+  The phone makes those two copies before uploading (`src/lib/resize.ts`),
+  since Workers can't run sharp. The admin's "download all" zip is built in the
+  browser too, to stay inside a Worker's CPU limit.
+- **SimpleWebAuthn** for passkeys, **Resend** for email.
+- Configuration in `wrangler.jsonc`: `ADMIN_EMAIL`, `TIME_ZONE`, `MAIL_FROM`,
+  plus the `RESEND_API_KEY` secret.
 
 ## Sign-in
 
