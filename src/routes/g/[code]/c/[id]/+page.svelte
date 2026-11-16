@@ -1,12 +1,13 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
 	import { pts, plural } from '#lib/format.ts';
+	import { tv } from '#lib/colors.ts';
 	import Thumb from '#lib/components/Thumb.svelte';
 	import ClaimFields from '#lib/components/ClaimFields.svelte';
+	import Uploader from '#lib/components/Uploader.svelte';
+	import PhotoEditor from '#lib/components/PhotoEditor.svelte';
 	let { data, form } = $props();
-	let busy = $state(false);
-	let picked = $state(0);
 	const open = $derived(data.game.submissions_open && data.category.active);
+	const canEdit = (p: { user_id: number }) => p.user_id === data.user?.id || data.isAdmin;
 </script>
 
 <a class="muted small" href="/g/{data.game.code}">← Board</a>
@@ -32,28 +33,50 @@
 </div>
 
 {#if data.team && open}
-	<form method="POST" enctype="multipart/form-data" class="card stack" style="border-color:var(--team);border-width:2px"
-		use:enhance={() => { busy = true; return async ({ update }) => { await update(); busy = false; }; }}>
-		<h2 style="margin:0">Add a photo</h2>
-		<label class="btn team block">
-			{picked ? `${plural(picked, 'photo')} chosen — tap to change` : '📷 Take or choose a photo'}
-			<input type="file" name="photo" accept="image/jpeg,image/png,image/webp" multiple required hidden
-				onchange={(e) => (picked = e.currentTarget.files?.length ?? 0)} />
-		</label>
-		<ClaimFields options={data.options} />
-		<label>Caption (optional) <input name="caption" maxlength="200" /></label>
-		{#if form?.error}<p class="err">{form.error}</p>{/if}
-		<button class="primary" disabled={busy || !picked}>{busy ? 'Uploading…' : 'Submit'}</button>
-	</form>
-{:else if !open}
+	<div class="card stack" style="border-color:var(--team);border-width:2px">
+		<h2 style="margin:0">Add photos here</h2>
+		<Uploader>
+			{#snippet fields()}
+				<ClaimFields options={data.options} />
+				<label>Caption (optional) <input name="caption" maxlength="200" /></label>
+			{/snippet}
+		</Uploader>
+		{#if form?.error}<p class="err" style="margin:0">{form.error}</p>{/if}
+		{#if form?.added}<p class="ok" style="margin:0">{plural(form.added, 'photo')} added.</p>{/if}
+	</div>
+{:else if !data.team}
+	<p class="muted">Join a team on the <a href="/g/{data.game.code}">board</a> to submit photos.</p>
+{:else}
 	<p class="muted">Submissions are closed.</p>
 {/if}
 
 {#if data.ours.length}
 	<h2>Your team's photos</h2>
-	<div class="photos" style="margin-bottom:16px">
-		{#each data.ours as p}
-			<Thumb photo={p} code={data.game.code} tag={p.score.counted ? `${pts(p.score.points)} pt` : p.status === 'ok' ? 'extra' : ''} />
+	<div class="stack" style="margin-bottom:16px;gap:10px">
+		{#each data.ours as p (p.id)}
+			<div class="card ourrow" style="{tv(p.color)}">
+				<div class="row" style="flex-wrap:nowrap">
+					<div class="ourthumb"><Thumb photo={p} code={data.game.code} /></div>
+					<div class="grow">
+						<strong>{p.who}</strong>
+						{#if p.caption}<div class="small">{p.caption}</div>{/if}
+						<div class="muted small">
+							{#if p.status === 'disqualified'}Disqualified
+							{:else if p.status === 'review'}Under review
+							{:else if p.score.counted}{pts(p.score.points)} pt
+							{:else}Over the scoring limit{/if}
+						</div>
+					</div>
+				</div>
+				{#if canEdit(p)}
+					<details>
+						<summary>Edit</summary>
+						<div class="stack" style="margin-top:10px">
+							<PhotoEditor photo={p} code={data.game.code} options={data.options} claims={p.claims} categories={data.categories} />
+						</div>
+					</details>
+				{/if}
+			</div>
 		{/each}
 	</div>
 {/if}
@@ -63,3 +86,9 @@
 		{#each data.theirs as p}<Thumb photo={p} code={data.game.code} />{/each}
 	</div>
 {/if}
+
+<style>
+	.ourrow { padding: 10px; margin: 0; display: grid; gap: 8px; }
+	.ourthumb { width: 84px; flex: none; }
+	summary { cursor: pointer; font-weight: 600; }
+</style>

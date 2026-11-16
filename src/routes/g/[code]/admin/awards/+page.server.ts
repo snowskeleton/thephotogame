@@ -90,7 +90,7 @@ export const actions = {
 				game.id, teamId, userId, title, str(f.get('note'), 400), num(f.get('points')), now()
 			);
 			for (const pid of new Set(photoIds))
-				if (get('SELECT 1 FROM photo WHERE id = ? AND game_id = ?', pid, game.id))
+				if (get('SELECT 1 FROM photo WHERE id = ? AND game_id = ? AND category_id IS NOT NULL', pid, game.id))
 					run('INSERT INTO grant_photo (grant_id, photo_id) VALUES (?, ?)', id, pid);
 		});
 		return { granted: true };

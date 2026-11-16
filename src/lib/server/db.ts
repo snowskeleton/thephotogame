@@ -8,6 +8,22 @@ mkdirSync(join(DATA_DIR, 'photos'), { recursive: true });
 const db = new DatabaseSync(join(DATA_DIR, 'photogame.db'));
 db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
 
+// category_id is NULL while a photo waits in its photographer's unsorted pile.
+const PHOTO_COLUMNS = `
+	id INTEGER PRIMARY KEY,
+	game_id INTEGER NOT NULL REFERENCES game(id) ON DELETE CASCADE,
+	category_id INTEGER REFERENCES category(id) ON DELETE CASCADE,
+	user_id INTEGER NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+	team_id INTEGER NOT NULL REFERENCES team(id) ON DELETE CASCADE,
+	caption TEXT NOT NULL DEFAULT '',
+	ext TEXT NOT NULL,
+	width INTEGER NOT NULL,
+	height INTEGER NOT NULL,
+	status TEXT NOT NULL DEFAULT 'ok',
+	points_override REAL,
+	created_at INTEGER NOT NULL
+`;
+
 db.exec(`
 CREATE TABLE IF NOT EXISTS user (
 	id INTEGER PRIMARY KEY,
@@ -89,20 +105,7 @@ CREATE TABLE IF NOT EXISTS score_option (
 	kind TEXT NOT NULL DEFAULT 'tier',
 	sort INTEGER NOT NULL DEFAULT 0
 );
-CREATE TABLE IF NOT EXISTS photo (
-	id INTEGER PRIMARY KEY,
-	game_id INTEGER NOT NULL REFERENCES game(id) ON DELETE CASCADE,
-	category_id INTEGER NOT NULL REFERENCES category(id) ON DELETE CASCADE,
-	user_id INTEGER NOT NULL REFERENCES user(id) ON DELETE CASCADE,
-	team_id INTEGER NOT NULL REFERENCES team(id) ON DELETE CASCADE,
-	caption TEXT NOT NULL DEFAULT '',
-	ext TEXT NOT NULL,
-	width INTEGER NOT NULL,
-	height INTEGER NOT NULL,
-	status TEXT NOT NULL DEFAULT 'ok',
-	points_override REAL,
-	created_at INTEGER NOT NULL
-);
+CREATE TABLE IF NOT EXISTS photo (${PHOTO_COLUMNS});
 CREATE TABLE IF NOT EXISTS photo_claim (
 	photo_id INTEGER NOT NULL REFERENCES photo(id) ON DELETE CASCADE,
 	option_id INTEGER NOT NULL REFERENCES score_option(id) ON DELETE CASCADE,
@@ -159,6 +162,30 @@ CREATE INDEX IF NOT EXISTS member_user ON member(user_id);
 const hasColumn = (table: string, col: string) =>
 	(db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).some((c) => c.name === col);
 if (!hasColumn('user', 'last_seen_at')) db.exec('ALTER TABLE user ADD COLUMN last_seen_at INTEGER');
+
+// Unsorted photos: photo.category_id used to be NOT NULL. SQLite can't relax that in place, so rebuild
+// the table (the documented create-copy-drop-rename procedure, with foreign keys off).
+const photoCat = (db.prepare('PRAGMA table_info(photo)').all() as { name: string; notnull: number }[]).find(
+	(c) => c.name === 'category_id'
+);
+if (photoCat?.notnull) {
+	const cols = 'id, game_id, category_id, user_id, team_id, caption, ext, width, height, status, points_override, created_at';
+	db.exec('PRAGMA foreign_keys = OFF');
+	try {
+		db.exec(`BEGIN IMMEDIATE;
+			CREATE TABLE photo_new (${PHOTO_COLUMNS});
+			INSERT INTO photo_new (${cols}) SELECT ${cols} FROM photo;
+			DROP TABLE photo;
+			ALTER TABLE photo_new RENAME TO photo;
+			CREATE INDEX IF NOT EXISTS photo_game ON photo(game_id, category_id);
+			COMMIT;`);
+	} catch (e) {
+		if (db.isTransaction) db.exec('ROLLBACK');
+		throw e;
+	} finally {
+		db.exec('PRAGMA foreign_keys = ON');
+	}
+}
 
 type P = SQLInputValue;
 const cache = new Map<string, ReturnType<typeof db.prepare>>();

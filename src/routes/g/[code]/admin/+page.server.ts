@@ -12,7 +12,7 @@ export const load = async ({ params, url }) => {
 		link,
 		qr: await QRCode.toDataURL(link, { margin: 2, width: 320 }),
 		stats: get<{ photos: number; hidden: number }>(
-			`SELECT COUNT(*) AS photos, COALESCE(SUM(created_at > ?), 0) AS hidden FROM photo WHERE game_id = ?`,
+			`SELECT COUNT(*) AS photos, COALESCE(SUM(created_at > ?), 0) AS hidden FROM photo WHERE game_id = ? AND category_id IS NOT NULL`,
 			game.revealed_at,
 			game.id
 		)!

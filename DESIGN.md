@@ -112,14 +112,29 @@ system). Checks on that:
 
 ## Screens
 
-Player: **Board** (bingo grid or checklist in team color), **Category**
-(rules, scoring, upload), **Gallery** (by category, team, day), **Photo**
+Player: **Board** (bulk upload, unsorted photos, bingo grid or checklist in
+team color), **Category** (rules, scoring, upload, edit your team's photos), **Gallery** (by category, team, day), **Photo**
 (points, doubt, review vote), **Slideshow** (for the nightly look-through),
 **Vote**, **Scores** (teams, people, awards), **Account**.
 
 Admin: **Game** settings (visibility, reveal, team mode, max team size, doubt
 limit, bingo, submissions open/closed, download all), **Categories**,
 **Awards**, **Teams & players**, and site-wide **Users** and **Games**.
+
+## Uploading
+
+The board's **Upload photos** button takes any number of photos. They land in
+the photographer's **unsorted** pile (`photo.category_id` is NULL) and get
+filed with a category dropdown each. Unsorted photos earn nothing, appear in
+no gallery, and only the photographer's team (and admins) can load them.
+Filing one sets its time to "now", so in hidden mode a photo filed after a
+reveal waits for the next reveal.
+
+A category page also uploads (straight into that category, with the claim and
+caption) and stays on the page. Its list of the team's photos has an editor for
+the photographer and admins: claim, caption, move to another category (the
+claim restarts at the first option) and delete. The page sends one photo per
+request with a progress bar, so a big batch doesn't fail as a whole.
 
 ## Visibility
 

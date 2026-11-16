@@ -3,6 +3,18 @@ import { all, get, insert, run } from '#lib/server/db.ts';
 import { validColor } from '#lib/colors.ts';
 import { enter, str } from '#lib/server/game.ts';
 import { scoreGame } from '#lib/server/scoring.ts';
+import { remove } from '#lib/server/images.ts';
+import { categoryIn, fileInto, savePhotos, unsortedFor } from '#lib/server/uploads.ts';
+
+/** One of the viewer's own unsorted photos, or a failure. */
+function unsortedPhoto(f: FormData, gameId: number, userId: number) {
+	return get<{ id: number }>(
+		'SELECT id FROM photo WHERE id = ? AND game_id = ? AND user_id = ? AND category_id IS NULL',
+		Number(f.get('photo_id')),
+		gameId,
+		userId
+	);
+}
 
 export const load = ({ params, locals, url }) => {
 	const { game, viewer } = enter(locals, params.code, url.pathname);
@@ -15,13 +27,13 @@ export const load = ({ params, locals, url }) => {
 	const mine = viewer.teamId
 		? all<{ category_id: number; n: number; cover: number }>(
 				`SELECT category_id, COUNT(*) AS n, MAX(id) AS cover FROM photo
-				 WHERE team_id = ? AND status != 'disqualified' GROUP BY category_id`,
+				 WHERE team_id = ? AND category_id IS NOT NULL AND status != 'disqualified' GROUP BY category_id`,
 				viewer.teamId
 			)
 		: [];
 	const others = all<{ category_id: number; color: string }>(
 		`SELECT DISTINCT p.category_id, t.color FROM photo p JOIN team t ON t.id = p.team_id
-		 WHERE p.game_id = ? AND p.status != 'disqualified' AND p.team_id != ?`,
+		 WHERE p.game_id = ? AND p.category_id IS NOT NULL AND p.status != 'disqualified' AND p.team_id != ?`,
 		game.id,
 		viewer.teamId ?? -1
 	);
@@ -32,10 +44,32 @@ export const load = ({ params, locals, url }) => {
 		game.id
 	);
 	const score = scoreGame(game).teams.find((t) => t.id === viewer.teamId) ?? null;
-	return { categories, mine, others, teams, score };
+	return { categories, mine, others, teams, score, unsorted: unsortedFor(game.id, viewer.user.id) };
 };
 
 export const actions = {
+	upload: async ({ request, params, locals, url }) => {
+		const { game, viewer } = enter(locals, params.code, url.pathname);
+		return savePhotos(game, viewer, await request.formData(), null);
+	},
+	file: async ({ request, params, locals, url }) => {
+		const { game, viewer } = enter(locals, params.code, url.pathname);
+		const f = await request.formData();
+		const photo = unsortedPhoto(f, game.id, viewer.user.id);
+		if (!photo) return fail(400, { error: 'That photo has already been sorted or deleted.' });
+		const category = categoryIn(game.id, f.get('category'));
+		if (!category) return fail(400, { error: 'Pick a category.' });
+		if (!game.submissions_open || !category.active) return fail(400, { error: 'Submissions are closed.' });
+		fileInto(photo.id, category.id, true);
+		return { filed: category.name };
+	},
+	discard: async ({ request, params, locals, url }) => {
+		const { game, viewer } = enter(locals, params.code, url.pathname);
+		const photo = unsortedPhoto(await request.formData(), game.id, viewer.user.id);
+		if (!photo) return;
+		run('DELETE FROM photo WHERE id = ?', photo.id);
+		await remove(photo.id);
+	},
 	joinTeam: async ({ request, params, locals, url }) => {
 		const { game, viewer } = enter(locals, params.code, url.pathname);
 		if (game.team_mode !== 'self') return fail(403, { error: 'The showrunner is assigning teams.' });

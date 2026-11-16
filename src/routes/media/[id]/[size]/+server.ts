@@ -13,8 +13,8 @@ const TYPES: Record<string, string> = {
 export const GET = ({ params, locals }) => {
 	if (!locals.user) error(401, 'Sign in first');
 	const id = Number(params.id);
-	const p = get<{ game_id: number; team_id: number; created_at: number; ext: string }>(
-		'SELECT game_id, team_id, created_at, ext FROM photo WHERE id = ?',
+	const p = get<{ game_id: number; category_id: number | null; team_id: number; created_at: number; ext: string }>(
+		'SELECT game_id, category_id, team_id, created_at, ext FROM photo WHERE id = ?',
 		id
 	);
 	if (!p) error(404, 'Not found');
@@ -26,6 +26,8 @@ export const GET = ({ params, locals }) => {
 	);
 	const isAdmin = !!locals.user.is_admin;
 	if (!m && !isAdmin) error(403, 'Not your game');
+	// Unsorted photos stay with their team until they're filed into a category.
+	if (p.category_id === null && !isAdmin && p.team_id !== m?.team_id) error(403, 'Not revealed yet');
 	if (!canSee(game, { user: locals.user, teamId: m?.team_id ?? null, isAdmin }, p)) error(403, 'Not revealed yet');
 
 	const size = params.size;

@@ -5,6 +5,7 @@ import { optionsFor, saveClaims } from '#lib/server/claims.ts';
 import { remove } from '#lib/server/images.ts';
 import { onePhoto } from '#lib/server/photos.ts';
 import { scoreGame } from '#lib/server/scoring.ts';
+import { categoryIn, fileInto } from '#lib/server/uploads.ts';
 
 function ctx(event: { params: { code: string; id: string }; locals: App.Locals; url: URL }) {
 	const { game, viewer } = enter(event.locals, event.params.code, event.url.pathname);
@@ -48,9 +49,12 @@ export const load = (event) => {
 			`SELECT g.title, g.points FROM grant_photo gp JOIN grant_award g ON g.id = gp.grant_id WHERE gp.photo_id = ?`,
 			photo.id
 		),
-		categories: viewer.isAdmin
-			? all<{ id: number; name: string }>('SELECT id, name FROM category WHERE game_id = ? ORDER BY sort, id', game.id)
-			: [],
+		categories: all<{ id: number; name: string }>(
+			`SELECT id, name FROM category WHERE game_id = ? AND (active = 1 OR ? OR id = ?) ORDER BY sort, id`,
+			game.id,
+			viewer.isAdmin ? 1 : 0,
+			photo.category_id
+		),
 		isNew: event.url.searchParams.has('new')
 	};
 };
@@ -77,9 +81,22 @@ export const actions = {
 		run('INSERT OR REPLACE INTO review_vote (photo_id, user_id, agree) VALUES (?, ?, ?)', photo.id, viewer.user.id, agree);
 	},
 	claims: async (event) => {
-		const { viewer, photo, mine } = ctx(event);
+		const { game, viewer, photo, mine } = ctx(event);
 		if (!mine && !viewer.isAdmin) return fail(403, { error: 'Only the photographer can change this.' });
 		const f = await event.request.formData();
+		const cat = Number(f.get('category'));
+		if (cat && cat !== photo.category_id) {
+			const target = categoryIn(game.id, cat);
+			if (!target) return fail(400, { error: 'That category is gone.' });
+			if (!viewer.isAdmin) {
+				if (!game.submissions_open || !target.active) return fail(400, { error: 'Submissions are closed.' });
+				if (photo.status !== 'ok') return fail(400, { error: 'A photo under review or disqualified can’t be moved.' });
+			}
+			run('UPDATE photo SET caption = ? WHERE id = ?', str(f.get('caption'), 200), photo.id);
+			// The claim belonged to the old category's options, so it starts over.
+			fileInto(photo.id, target.id, false);
+			return { saved: true, moved: target.name };
+		}
 		saveClaims(photo.id, photo.category_id, f);
 		run('UPDATE photo SET caption = ? WHERE id = ?', str(f.get('caption'), 200), photo.id);
 		return { saved: true };
@@ -102,18 +119,11 @@ export const actions = {
 		run('DELETE FROM review_vote WHERE photo_id = ?', photo.id);
 	},
 	adjust: async (event) => {
-		const { game, viewer, photo } = ctx(event);
+		const { viewer, photo } = ctx(event);
 		if (!viewer.isAdmin) return fail(403, { error: 'Admins only' });
 		const f = await event.request.formData();
 		const raw = String(f.get('points') ?? '').trim();
 		run('UPDATE photo SET points_override = ? WHERE id = ?', raw === '' ? null : num(raw), photo.id);
-		const cat = Number(f.get('category'));
-		if (cat && cat !== photo.category_id && get('SELECT 1 FROM category WHERE id = ? AND game_id = ?', cat, game.id)) {
-			run('UPDATE photo SET category_id = ? WHERE id = ?', cat, photo.id);
-			run('DELETE FROM photo_claim WHERE photo_id = ?', photo.id);
-			const tiers = optionsFor(cat).filter((o) => o.kind === 'tier');
-			if (tiers[0]) run('INSERT INTO photo_claim (photo_id, option_id, qty) VALUES (?, ?, 1)', photo.id, tiers[0].id);
-		}
 		return { saved: true };
 	}
 };

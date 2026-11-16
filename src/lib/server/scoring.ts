@@ -69,7 +69,7 @@ export function scoreGame(game: Game) {
 		`SELECT p.id, p.category_id, p.team_id, p.user_id, p.status, p.points_override,
 			COALESCE((SELECT SUM(o.points * c.qty) FROM photo_claim c
 				JOIN score_option o ON o.id = c.option_id WHERE c.photo_id = p.id), 0) AS claimed
-		 FROM photo p WHERE p.game_id = ?`,
+		 FROM photo p WHERE p.game_id = ? AND p.category_id IS NOT NULL`,
 		game.id
 	);
 

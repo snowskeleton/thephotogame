@@ -2,7 +2,7 @@
 	import { tv } from '#lib/colors.ts';
 	import { enhance } from '$app/forms';
 	import { pts, plural } from '#lib/format.ts';
-	import ClaimFields from '#lib/components/ClaimFields.svelte';
+	import PhotoEditor from '#lib/components/PhotoEditor.svelte';
 	let { data, form } = $props();
 	const p = $derived(data.photo);
 	const base = $derived(`/g/${data.game.code}`);
@@ -69,17 +69,10 @@
 
 {#if data.mine || data.isAdmin}
 	<details class="card">
-		<summary>Edit claim or caption</summary>
-		<form method="POST" action="?/claims" class="stack" style="margin-top:12px" use:enhance>
-			<ClaimFields options={data.options} claims={data.claims} />
-			<label>Caption <input name="caption" maxlength="200" defaultValue={p.caption} /></label>
-			{#if form?.saved}<p class="ok">Saved.</p>{/if}
-			<button class="primary">Save</button>
-		</form>
-		<hr />
-		<form method="POST" action="?/delete" onsubmit={(e) => { if (!confirm('Delete this photo for good?')) e.preventDefault(); }}>
-			<button class="danger block">Delete photo</button>
-		</form>
+		<summary>Edit photo</summary>
+		<div class="stack" style="margin-top:12px">
+			<PhotoEditor photo={p} code={data.game.code} options={data.options} claims={data.claims} categories={data.categories} />
+		</div>
 	</details>
 {/if}
 
@@ -93,11 +86,6 @@
 		<form method="POST" action="?/adjust" class="stack" use:enhance>
 			<label>Set points yourself (leave empty to use the claim)
 				<input name="points" inputmode="decimal" defaultValue={data.override ?? ''} placeholder={pts(data.score.claimed)} /></label>
-			<label>Category
-				<select name="category">
-					{#each data.categories as c}<option value={c.id} selected={c.id === p.category_id}>{c.name}</option>{/each}
-				</select>
-			</label>
 			<button>Save</button>
 		</form>
 		<a class="btn" href="{base}/admin/awards?photo={p.id}#pencil">🏅 Pencil in an award for this photo</a>

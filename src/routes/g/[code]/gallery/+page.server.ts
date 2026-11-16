@@ -16,7 +16,7 @@ export const load = ({ params, locals, url }) => {
 		days: [...new Set(everything.map((p) => p.day))],
 		hiddenCount: viewer.isAdmin
 			? 0
-			: (all<{ n: number }>('SELECT COUNT(*) AS n FROM photo WHERE game_id = ?', game.id)[0].n - everything.length),
+			: (all<{ n: number }>('SELECT COUNT(*) AS n FROM photo WHERE game_id = ? AND category_id IS NOT NULL', game.id)[0].n - everything.length),
 		categories: all<{ id: number; name: string }>(
 			'SELECT id, name FROM category WHERE game_id = ? ORDER BY sort, id',
 			game.id
