@@ -52,7 +52,7 @@ export const load = async (event) => {
 		categories: await all<{ id: number; name: string }>(
 			`SELECT id, name FROM category WHERE game_id = ? AND (active = 1 OR ? OR id = ?) ORDER BY sort, id`,
 			game.id,
-			viewer.isAdmin ? 1 : 0,
+			viewer.isHost ? 1 : 0,
 			photo.category_id
 		),
 		isNew: event.url.searchParams.has('new')
@@ -82,13 +82,13 @@ export const actions = {
 	},
 	claims: async (event) => {
 		const { game, viewer, photo, mine } = await ctx(event);
-		if (!mine && !viewer.isAdmin) return fail(403, { error: 'Only the photographer can change this.' });
+		if (!mine && !viewer.isHost) return fail(403, { error: 'Only the photographer can change this.' });
 		const f = await event.request.formData();
 		const cat = Number(f.get('category'));
 		if (cat && cat !== photo.category_id) {
 			const target = await categoryIn(game.id, cat);
 			if (!target) return fail(400, { error: 'That category is gone.' });
-			if (!viewer.isAdmin) {
+			if (!viewer.isHost) {
 				if (!game.submissions_open || !target.active) return fail(400, { error: 'Submissions are closed.' });
 				if (photo.status !== 'ok') return fail(400, { error: 'A photo under review or disqualified can’t be moved.' });
 			}
@@ -103,7 +103,7 @@ export const actions = {
 	},
 	delete: async (event) => {
 		const { game, viewer, photo, mine } = await ctx(event);
-		if (!mine && !viewer.isAdmin) return fail(403, { error: 'Only the photographer can delete this.' });
+		if (!mine && !viewer.isHost) return fail(403, { error: 'Only the photographer can delete this.' });
 		const gone = await get<{ id: number; ext: string }>('DELETE FROM photo WHERE id = ? RETURNING id, ext', photo.id);
 		if (gone) await remove([gone]);
 		redirect(303, `/g/${game.code}/c/${photo.category_id}`);
@@ -111,7 +111,7 @@ export const actions = {
 	// Admin only below.
 	settle: async (event) => {
 		const { viewer, photo } = await ctx(event);
-		if (!viewer.isAdmin) return fail(403, { error: 'Admins only' });
+		if (!viewer.isHost) return fail(403, { error: 'Admins only' });
 		const to = (await event.request.formData()).get('to') === 'disqualified' ? 'disqualified' : 'ok';
 		await run('UPDATE photo SET status = ? WHERE id = ?', to, photo.id);
 		// Clearing doubts means an approved photo doesn't bounce straight back into review.
@@ -120,7 +120,7 @@ export const actions = {
 	},
 	adjust: async (event) => {
 		const { viewer, photo } = await ctx(event);
-		if (!viewer.isAdmin) return fail(403, { error: 'Admins only' });
+		if (!viewer.isHost) return fail(403, { error: 'Admins only' });
 		const f = await event.request.formData();
 		const raw = String(f.get('points') ?? '').trim();
 		await run('UPDATE photo SET points_override = ? WHERE id = ?', raw === '' ? null : num(raw), photo.id);

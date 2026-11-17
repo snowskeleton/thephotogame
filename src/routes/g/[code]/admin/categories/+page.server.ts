@@ -1,6 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { all, batch, get, q } from '#lib/server/db.ts';
-import { gameByCode, num, requireAdmin, str } from '#lib/server/game.ts';
+import { gameByCode, num, requireHost, str } from '#lib/server/game.ts';
 
 const list = async (gameId: number) =>
 	await all<{ id: number; name: string; day_label: string; active: number; sort: number; photos: number; scoring: string | null }>(
@@ -16,8 +16,7 @@ export const load = async ({ params }) => ({ categories: await list((await gameB
 
 export const actions = {
 	add: async ({ request, params, locals }) => {
-		requireAdmin(locals);
-		const game = await gameByCode(params.code);
+		const game = await requireHost(locals, params.code);
 		const f = await request.formData();
 		const name = str(f.get('name'), 80);
 		if (!name) return fail(400, { error: 'Give the category a name.' });
@@ -30,8 +29,7 @@ export const actions = {
 		if (f.get('then') === 'edit') redirect(303, `/g/${game.code}/admin/categories/${id}`);
 	},
 	move: async ({ request, params, locals }) => {
-		requireAdmin(locals);
-		const game = await gameByCode(params.code);
+		const game = await requireHost(locals, params.code);
 		const f = await request.formData();
 		const ids = (await list(game.id)).map((c) => c.id);
 		const i = ids.indexOf(Number(f.get('id')));

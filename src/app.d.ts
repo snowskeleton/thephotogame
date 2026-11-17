@@ -3,7 +3,7 @@ import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 declare global {
 	namespace App {
 		interface Locals {
-			user: { id: number; email: string; name: string; is_admin: number } | null;
+			user: { id: number; email: string; name: string; is_admin: number; verified: boolean } | null;
 		}
 	}
 	interface Env {
@@ -13,6 +13,8 @@ declare global {
 		TIME_ZONE?: string;
 		MAIL_FROM?: string;
 		RESEND_API_KEY?: string;
+		TURNSTILE_SITE_KEY?: string;
+		TURNSTILE_SECRET?: string;
 	}
 }
 

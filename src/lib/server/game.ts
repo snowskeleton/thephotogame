@@ -1,5 +1,6 @@
 import { error, redirect } from '@sveltejs/kit';
-import { get } from './db.ts';
+import { get, insert, now } from './db.ts';
+import { settings } from './settings.ts';
 import type { User } from './auth.ts';
 
 export type Game = {
@@ -19,7 +20,9 @@ export type Game = {
 	created_at: number;
 };
 export type Team = { id: number; game_id: number; name: string; color: string };
-export type Viewer = { user: User; teamId: number | null; isAdmin: boolean };
+/** isHost: may run this game (a host of it, or the site admin). */
+export type Viewer = { user: User; teamId: number | null; isHost: boolean };
+type Membership = { team_id: number | null; role: string; status: string };
 
 export async function gameByCode(code: string): Promise<Game> {
 	const g = await get<Game>('SELECT * FROM game WHERE code = ?', code);
@@ -27,26 +30,68 @@ export async function gameByCode(code: string): Promise<Game> {
 	return g;
 }
 
-/** Loads the game and the signed-in player's place in it; sends strangers to the join page. */
+const membership = (gameId: number, userId: number) =>
+	get<Membership>('SELECT team_id, role, status FROM member WHERE game_id = ? AND user_id = ?', gameId, userId);
+
+/** Loads the game and the signed-in player's place in it; sends strangers (and the not-yet-accepted) to the join page. */
 export async function enter(locals: App.Locals, code: string): Promise<{ game: Game; viewer: Viewer }> {
 	const game = await gameByCode(code);
 	if (!locals.user) redirect(303, `/join/${game.code}`);
-	const m = await get<{ team_id: number | null }>(
-		'SELECT team_id FROM member WHERE game_id = ? AND user_id = ?',
-		game.id,
-		locals.user.id
-	);
-	if (!m && !locals.user.is_admin) redirect(303, `/join/${game.code}`);
+	const m = await membership(game.id, locals.user.id);
+	const active = m?.status === 'active';
+	if (!active && !locals.user.is_admin) redirect(303, `/join/${game.code}`);
 	return {
 		game,
-		viewer: { user: locals.user, teamId: m?.team_id ?? null, isAdmin: !!locals.user.is_admin }
+		viewer: {
+			user: locals.user,
+			teamId: active ? m!.team_id : null,
+			isHost: !!locals.user.is_admin || (active && m!.role === 'host')
+		}
 	};
 }
 
+/** The game, if the signed-in person may run it (one of its hosts, or the site admin). */
+export async function requireHost(locals: App.Locals, code: string): Promise<Game> {
+	if (!locals.user) redirect(303, '/login');
+	const game = await gameByCode(code);
+	if (locals.user.is_admin) return game;
+	const m = await membership(game.id, locals.user.id);
+	if (m?.status !== 'active' || m.role !== 'host') error(403, 'Only this game’s hosts can do that');
+	return game;
+}
+
+/** Site admins only: the site-wide pages (all games, all people, settings). */
 export function requireAdmin(locals: App.Locals): User {
 	if (!locals.user) redirect(303, '/login');
-	if (!locals.user.is_admin) error(403, 'Admins only');
+	if (!locals.user.is_admin) error(403, 'Site admins only');
 	return locals.user;
+}
+
+/** Whether this person may create a game now, and if not, why. */
+export async function hostingCheck(user: User): Promise<{ ok: true } | { ok: false; why: 'closed' | 'unverified' | 'limit'; limit?: number }> {
+	if (user.is_admin) return { ok: true };
+	const s = await settings();
+	if (!s.signups) return { ok: false, why: 'closed' };
+	if (!user.verified) return { ok: false, why: 'unverified' };
+	const made = (await get<{ n: number }>('SELECT COUNT(*) AS n FROM game WHERE created_by = ?', user.id))!.n;
+	if (made >= s.maxGames) return { ok: false, why: 'limit', limit: s.maxGames };
+	return { ok: true };
+}
+
+const randomCode = async () => {
+	const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+	for (;;) {
+		const code = Array.from({ length: 4 }, () => letters[Math.floor(Math.random() * letters.length)]).join('');
+		if (!(await get('SELECT 1 FROM game WHERE code = ?', code))) return code;
+	}
+};
+
+/** Creates a game with its creator as host. Check hostingCheck first. */
+export async function createGame(user: User, name: string): Promise<string> {
+	const code = await randomCode();
+	const id = await insert('INSERT INTO game (code, name, created_by, created_at) VALUES (?, ?, ?, ?)', code, name, user.id, now());
+	await insert("INSERT INTO member (game_id, user_id, role, status) VALUES (?, ?, 'host', 'active')", id, user.id);
+	return code;
 }
 
 export function canSee(
@@ -55,7 +100,7 @@ export function canSee(
 	photo: { team_id: number; created_at: number }
 ): boolean {
 	return (
-		viewer.isAdmin ||
+		viewer.isHost ||
 		game.visibility === 'open' ||
 		photo.team_id === viewer.teamId ||
 		photo.created_at <= game.revealed_at
@@ -64,7 +109,7 @@ export function canSee(
 
 /** SQL condition (on alias `p`) matching the photos this viewer may see. */
 export function visibleSql(game: Game, viewer: Viewer): { sql: string; params: number[] } {
-	if (viewer.isAdmin || game.visibility === 'open') return { sql: '1=1', params: [] };
+	if (viewer.isHost || game.visibility === 'open') return { sql: '1=1', params: [] };
 	return {
 		sql: '(p.team_id = ? OR p.created_at <= ?)',
 		params: [viewer.teamId ?? -1, game.revealed_at]

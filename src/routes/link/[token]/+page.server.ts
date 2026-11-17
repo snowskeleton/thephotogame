@@ -9,6 +9,6 @@ export const actions = {
 		const userId = await useHandoff(params.token);
 		if (!userId) return fail(400, { error: 'This sign-in link has expired or was already used. Ask for a new one.' });
 		await startSession(cookies, userId);
-		redirect(303, offerPasskey(cookies, next));
+		redirect(303, await offerPasskey(userId, next));
 	}
 };

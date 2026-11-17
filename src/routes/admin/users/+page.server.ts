@@ -54,15 +54,12 @@ export const actions = {
 		const game = await gameById(f.get('game'));
 		const id = await createUser(email, name);
 		if (f.get('is_admin')) await run('UPDATE user SET is_admin = 1 WHERE id = ?', id);
-		if (game) await run('INSERT OR IGNORE INTO member (game_id, user_id) VALUES (?, ?)', game.id, id);
-		let sent = '';
-		if (f.get('invite')) {
-			try {
-				await sendInvite({ id, email, name }, url.origin, me.name, game);
-				sent = '&invited=1';
-			} catch {
-				sent = '&invited=0';
-			}
+		if (game) await run("INSERT OR IGNORE INTO member (game_id, user_id, status) VALUES (?, ?, 'invited')", game.id, id);
+		let sent = '&invited=1';
+		try {
+			await sendInvite({ id, email, name }, url.origin, me, game);
+		} catch {
+			sent = '&invited=0';
 		}
 		redirect(303, `/admin/users/${id}?added=1${sent}`);
 	},
@@ -70,7 +67,6 @@ export const actions = {
 		const me = requireAdmin(locals);
 		const f = await request.formData();
 		const game = await gameById(f.get('game'));
-		const invite = !!f.get('invite');
 		const lines = String(f.get('list') ?? '').split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 200);
 		const report = { added: [] as string[], already: [] as string[], bad: [] as string[], mailFailed: [] as string[] };
 		for (const line of lines) {
@@ -80,14 +76,14 @@ export const actions = {
 				continue;
 			}
 			const existing = await findUserByEmail(p.email);
-			const id = existing?.id ?? await createUser(p.email, p.name);
-			if (game) await run('INSERT OR IGNORE INTO member (game_id, user_id) VALUES (?, ?)', game.id, id);
-			if (existing) {
-				report.already.push(existing.name);
-				continue;
-			}
-			report.added.push(p.name);
-			if (invite) await sendInvite({ id, ...p }, url.origin, me.name, game).catch(() => report.mailFailed.push(p.name));
+			const id = existing?.id ?? (await createUser(p.email, p.name));
+			const who = { id, email: p.email, name: existing?.name ?? p.name };
+			if (existing) report.already.push(existing.name);
+			else report.added.push(p.name);
+			// Everyone added to a game gets an invite to it; new people without a game get one to the site.
+			const newToGame = game && (await run("INSERT OR IGNORE INTO member (game_id, user_id, status) VALUES (?, ?, 'invited')", game.id, id)).changes;
+			if (newToGame || (!game && !existing))
+				await sendInvite(who, url.origin, me, game).catch(() => report.mailFailed.push(who.name));
 		}
 		return { report, game: game?.name };
 	}

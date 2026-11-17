@@ -3,6 +3,7 @@ import { all, batch, get, insert, now, q, run } from './db.ts';
 import { str, type Game, type Viewer } from './game.ts';
 import { claimStatements, optionsFor } from './claims.ts';
 import { remove, sniff, store } from './images.ts';
+import { settings } from './settings.ts';
 
 export type Category = { id: number; name: string; active: number };
 
@@ -26,6 +27,7 @@ export async function savePhotos(game: Game, viewer: Viewer, f: FormData, catego
 	const large = file(f.get('large'));
 	if (!original) return fail(400, { error: 'Choose a photo first.' });
 	if (!thumb || !large) return fail(400, { error: 'Uploading needs JavaScript turned on.' });
+	if (await full(game.id)) return fail(400, { added: 0, error: 'This game has reached its photo limit. Ask the host to delete some.' });
 
 	const bytes = {
 		original: await original.arrayBuffer(),
@@ -38,10 +40,11 @@ export async function savePhotos(game: Game, viewer: Viewer, f: FormData, catego
 		return fail(400, { added: 0, error: `“${original.name}” isn’t a photo we can read. Try a JPEG or PNG.` });
 
 	const id = await insert(
-		`INSERT INTO photo (game_id, category_id, user_id, team_id, caption, ext, width, height, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO photo (game_id, category_id, user_id, team_id, caption, ext, width, height, bytes, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		game.id, category?.id ?? null, viewer.user.id, viewer.teamId, str(f.get('caption'), 200),
-		ext, dim(f.get('width')), dim(f.get('height')), now()
+		ext, dim(f.get('width')), dim(f.get('height')),
+		bytes.original.byteLength + bytes.thumb.byteLength + bytes.large.byteLength, now()
 	);
 	try {
 		await store(id, ext, bytes);
@@ -52,6 +55,18 @@ export async function savePhotos(game: Game, viewer: Viewer, f: FormData, catego
 	}
 	if (category) await batch(await claimStatements(id, category.id, f));
 	return { added: 1 };
+}
+
+/** Whether the game is at the site's photo limit. Games a site admin created have no limit. */
+async function full(gameId: number) {
+	const { maxPhotos } = await settings();
+	const g = (await get<{ n: number; admin: number | null }>(
+		`SELECT (SELECT COUNT(*) FROM photo WHERE game_id = g.id) AS n,
+			(SELECT is_admin FROM user WHERE id = g.created_by) AS admin
+		 FROM game g WHERE g.id = ?`,
+		gameId
+	))!;
+	return !g.admin && g.n >= maxPhotos;
 }
 
 /** Moves a photo into a category with that category's default claim (its first tier). */

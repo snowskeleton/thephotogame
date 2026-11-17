@@ -17,13 +17,17 @@
 	],
 	"r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "thephotogame-photos" }],
 	"vars": {
-		// The account with this email becomes an admin when it first signs in.
-		// If empty, the very first account created is the admin.
+		// This email becomes the site admin once it's confirmed (by email code or invite).
+		// If empty, the first person to confirm an email while there's no site admin becomes it.
 		"ADMIN_EMAIL": "",
 		// Used for grouping photos by day.
 		"TIME_ZONE": "America/New_York",
-		"MAIL_FROM": "The Photo Game <photogame@example.com>"
+		// The sender for codes and invites: an address on a domain verified in Resend.
+		"MAIL_FROM": "The Photo Game <photogame@example.com>",
+		// Cloudflare Turnstile site key (public). With TURNSTILE_SECRET set too, new accounts need the bot check.
+		"TURNSTILE_SITE_KEY": ""
 	}
-	// Secret (not here): RESEND_API_KEY, set with `npx wrangler secret put RESEND_API_KEY`.
-	// Without it, sign-in codes are printed to the log.
+	// Secrets (not here), set with `npx wrangler secret put <NAME>`:
+	//   RESEND_API_KEY    without it, sign-in codes and invites are printed to the log.
+	//   TURNSTILE_SECRET  the Turnstile widget's secret key.
 }

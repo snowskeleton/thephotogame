@@ -7,17 +7,17 @@ const SESSION_DAYS = 180;
 export const COOKIE = 'pg_session';
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 
-export type User = { id: number; email: string; name: string; is_admin: number };
+export type User = { id: number; email: string; name: string; is_admin: number; verified: boolean };
 
 export async function userFromToken(token: string | undefined): Promise<User | null> {
 	if (!token) return null;
-	const row = await get<User & { expires_at: number }>(
-		`SELECT u.id, u.email, u.name, u.is_admin, s.expires_at
+	const row = await get<Omit<User, 'verified'> & { email_verified_at: number | null; expires_at: number }>(
+		`SELECT u.id, u.email, u.name, u.is_admin, u.email_verified_at, s.expires_at
 		 FROM session s JOIN user u ON u.id = s.user_id WHERE s.token = ?`,
 		sha(token)
 	);
 	if (!row || row.expires_at < now()) return null;
-	return { id: row.id, email: row.email, name: row.name, is_admin: row.is_admin };
+	return { id: row.id, email: row.email, name: row.name, is_admin: row.is_admin, verified: !!row.email_verified_at };
 }
 
 export async function startSession(cookies: Cookies, userId: number) {
@@ -44,24 +44,31 @@ export function cleanEmail(v: unknown): string | null {
 }
 
 export async function findUserByEmail(email: string) {
-	return get<User>('SELECT id, email, name, is_admin FROM user WHERE email = ?', email);
-}
-
-/** Whether this email gets admin rights on sign-up: ADMIN_EMAIL, or else whoever signs up first. */
-export async function isFirstAdmin(email: string) {
-	const adminEmail = (config().ADMIN_EMAIL || '').trim().toLowerCase();
-	return adminEmail ? email === adminEmail : !(await get('SELECT 1 FROM user LIMIT 1'));
-}
-
-export async function createUser(email: string, name: string): Promise<number> {
-	const isAdmin = await isFirstAdmin(email);
-	return insert(
-		'INSERT INTO user (email, name, is_admin, created_at) VALUES (?, ?, ?, ?)',
-		email,
-		name,
-		isAdmin ? 1 : 0,
-		now()
+	return get<{ id: number; email: string; name: string; is_admin: number }>(
+		'SELECT id, email, name, is_admin FROM user WHERE email = ?',
+		email
 	);
+}
+
+/**
+ * Whether this email becomes the site admin once it's verified: ADMIN_EMAIL, or, if that's empty,
+ * whoever verifies first while there's no admin.
+ */
+export async function becomesAdmin(email: string) {
+	const adminEmail = (config().ADMIN_EMAIL || '').trim().toLowerCase();
+	return adminEmail ? email === adminEmail : !(await get('SELECT 1 FROM user WHERE is_admin = 1 LIMIT 1'));
+}
+
+/** New accounts are never admins: admin rights only come with a verified email (see markVerified). */
+export async function createUser(email: string, name: string): Promise<number> {
+	return insert('INSERT INTO user (email, name, created_at) VALUES (?, ?, ?)', email, name, now());
+}
+
+/** Records that this person proved they own their email address, and makes them site admin if they're meant to be. */
+export async function markVerified(userId: number) {
+	await run('UPDATE user SET email_verified_at = COALESCE(email_verified_at, ?) WHERE id = ?', now(), userId);
+	const u = await get<{ email: string; is_admin: number }>('SELECT email, is_admin FROM user WHERE id = ?', userId);
+	if (u && !u.is_admin && (await becomesAdmin(u.email))) await run('UPDATE user SET is_admin = 1 WHERE id = ?', userId);
 }
 
 /** Emails a six-digit sign-in code. `name` is kept so a brand new account can be created on verify. */
@@ -96,7 +103,7 @@ export async function checkCode(email: string, code: string): Promise<{ ok: bool
 	return { ok: true, name: row.name };
 }
 
-/** One-time sign-in token, used for QR hand-off and admin-made sign-in links. */
+/** One-time sign-in token, used for the QR hand-off to your own other devices and site-admin sign-in links. */
 export async function makeHandoff(userId: number, minutes: number): Promise<string> {
 	const token = randomBytes(24).toString('base64url');
 	await run('DELETE FROM handoff WHERE expires_at < ?', now());
@@ -119,29 +126,66 @@ export async function useHandoff(token: string): Promise<number | null> {
 	return row.expires_at < now() ? null : row.user_id;
 }
 
-/** Emails a one-time sign-in link (good for a week) to someone an admin added. */
+const INVITE_DAYS = 7;
+
+/**
+ * Emails an invite link (good for a week). Opening it signs the person in, counts as verifying their email
+ * and, with a game, makes them an active member of it. The link only ever goes to the person's own inbox.
+ */
 export async function sendInvite(
 	user: { id: number; email: string; name: string },
 	origin: string,
-	from: string,
-	game?: { code: string; name: string }
+	from: { id: number; name: string },
+	game?: { id: number; code: string; name: string } | null
 ) {
-	const link = `${origin}/link/${await makeHandoff(user.id, 7 * 24 * 60)}${game ? `?next=/g/${game.code}` : ''}`;
+	const token = randomBytes(24).toString('base64url');
+	await run('DELETE FROM invite WHERE expires_at < ?', now());
+	await run(
+		'INSERT INTO invite (token_hash, user_id, game_id, invited_by, expires_at) VALUES (?, ?, ?, ?, ?)',
+		sha(token),
+		user.id,
+		game?.id ?? null,
+		from.id,
+		now() + INVITE_DAYS * 86400_000
+	);
+	const link = `${origin}/invite/${token}`;
 	await sendMail(
 		user.email,
-		game ? `You're in: ${game.name}` : 'Your Photo Game sign-in link',
-		`Hi ${user.name},\n\n${from} added you to ${game ? `“${game.name}” on ` : ''}The Photo Game.\n\nTap to sign in:\n\n    ${link}\n\nThe link works once, for 7 days. After that you can sign in any time at ${origin}/login with this email address.`
+		game ? `${from.name} invited you to ${game.name}` : 'Your Photo Game invite',
+		`Hi ${user.name},\n\n${from.name} invited you to ${game ? `“${game.name}” on ` : ''}The Photo Game.\n\nTap to accept:\n\n    ${link}\n\nThe link works once, for ${INVITE_DAYS} days. After that you can sign in any time at ${origin}/login with this email address.`
 	);
 }
 
-export const PASSKEY_SKIP = 'pg_passkey_asked';
+export type Invite = { user_id: number; game_id: number | null; expires_at: number; name: string; email: string; game: string | null; code: string | null; from: string | null };
 
-/**
- * After signing in without a passkey, go via the "save a passkey" page on the way to `next`,
- * unless this device already saved one or said "not now" recently.
- */
-export function offerPasskey(cookies: Cookies, next: string): string {
-	return cookies.get(PASSKEY_SKIP) ? next : `/passkey?next=${encodeURIComponent(next)}`;
+export const findInvite = (token: string) =>
+	get<Invite>(
+		`SELECT i.user_id, i.game_id, i.expires_at, u.name, u.email, g.name AS game, g.code, f.name AS "from"
+		 FROM invite i JOIN user u ON u.id = i.user_id LEFT JOIN game g ON g.id = i.game_id LEFT JOIN user f ON f.id = i.invited_by
+		 WHERE i.token_hash = ?`,
+		sha(token)
+	);
+
+/** Uses up an invite: the person's email counts as verified and they join the game. Returns the invite, or null. */
+export async function acceptInvite(token: string): Promise<Invite | null> {
+	const inv = await findInvite(token);
+	await run('DELETE FROM invite WHERE token_hash = ?', sha(token));
+	if (!inv || inv.expires_at < now()) return null;
+	await markVerified(inv.user_id);
+	if (inv.game_id)
+		await run(
+			`INSERT INTO member (game_id, user_id, status) VALUES (?, ?, 'active')
+			 ON CONFLICT(game_id, user_id) DO UPDATE SET status = 'active'`,
+			inv.game_id,
+			inv.user_id
+		);
+	return inv;
+}
+
+/** After signing in, people without a passkey go via the "save a passkey" page on the way to `next`, every time. */
+export async function offerPasskey(userId: number, next: string): Promise<string> {
+	const has = await get('SELECT 1 FROM passkey WHERE user_id = ? LIMIT 1', userId);
+	return has ? next : `/passkey?next=${encodeURIComponent(next)}`;
 }
 
 /** Only allow redirects back into this site. */

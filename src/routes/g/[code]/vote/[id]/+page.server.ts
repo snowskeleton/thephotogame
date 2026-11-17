@@ -9,7 +9,7 @@ type Award = { id: number; name: string; description: string; points: number; sc
 async function ctx(event: { params: { code: string; id: string }; locals: App.Locals; url: URL }) {
 	const { game, viewer } = await enter(event.locals, event.params.code);
 	const award = await get<Award>('SELECT * FROM award WHERE id = ? AND game_id = ?', Number(event.params.id), game.id);
-	if (!award || (award.status === 'draft' && !viewer.isAdmin)) error(404, 'No such award');
+	if (!award || (award.status === 'draft' && !viewer.isHost)) error(404, 'No such award');
 	const photos = await listPhotos(game, viewer, { status: 'ok', oldestFirst: true });
 	return { game, viewer, award, photos };
 }

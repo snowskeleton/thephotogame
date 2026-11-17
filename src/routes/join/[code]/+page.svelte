@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { passkeySignIn } from '#lib/passkey.ts';
+	import Turnstile from '#lib/components/Turnstile.svelte';
 	let { data, form } = $props();
 	// Starting values are fixed when the page loads. Tying them to page state made Svelte write them
 	// back into the fields on every redraw, wiping whatever had been typed or autofilled.
@@ -49,6 +50,7 @@
 				required
 			/>
 		</label>
+		<Turnstile />
 		<p class="muted small">Your email is only used to sign you back in on another phone.</p>
 		{#if form?.error}<p class="err">{form.error}</p>{/if}
 		<button class="primary" disabled={busy}>{busy ? 'Joining…' : 'Join the game'}</button>

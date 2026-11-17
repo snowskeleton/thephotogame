@@ -1,6 +1,6 @@
 import { fail } from '@sveltejs/kit';
 import { all, batch, get, insert, now, q, run } from '#lib/server/db.ts';
-import { gameByCode, num, requireAdmin, str } from '#lib/server/game.ts';
+import { gameByCode, num, requireHost, str } from '#lib/server/game.ts';
 
 export const load = async ({ params, url }) => {
 	const game = await gameByCode(params.code);
@@ -36,8 +36,7 @@ export const load = async ({ params, url }) => {
 
 export const actions = {
 	addAward: async ({ request, params, locals }) => {
-		requireAdmin(locals);
-		const game = await gameByCode(params.code);
+		const game = await requireHost(locals, params.code);
 		const f = await request.formData();
 		const name = str(f.get('name'), 80);
 		if (!name) return fail(400, { error: 'Give the award a name.' });
@@ -47,8 +46,7 @@ export const actions = {
 		);
 	},
 	saveAward: async ({ request, params, locals }) => {
-		requireAdmin(locals);
-		const game = await gameByCode(params.code);
+		const game = await requireHost(locals, params.code);
 		const f = await request.formData();
 		const name = str(f.get('name'), 80);
 		if (!name) return fail(400, { error: 'Give the award a name.' });
@@ -59,21 +57,18 @@ export const actions = {
 		);
 	},
 	status: async ({ request, params, locals }) => {
-		requireAdmin(locals);
-		const game = await gameByCode(params.code);
+		const game = await requireHost(locals, params.code);
 		const f = await request.formData();
 		const to = String(f.get('to'));
 		if (!['draft', 'open', 'closed'].includes(to)) return fail(400, { error: 'Unknown status' });
 		await run('UPDATE award SET status = ? WHERE id = ? AND game_id = ?', to, Number(f.get('id')), game.id);
 	},
 	deleteAward: async ({ request, params, locals }) => {
-		requireAdmin(locals);
-		const game = await gameByCode(params.code);
+		const game = await requireHost(locals, params.code);
 		await run('DELETE FROM award WHERE id = ? AND game_id = ?', Number((await request.formData()).get('id')), game.id);
 	},
 	grant: async ({ request, params, locals }) => {
-		requireAdmin(locals);
-		const game = await gameByCode(params.code);
+		const game = await requireHost(locals, params.code);
 		const f = await request.formData();
 		const title = str(f.get('title'), 80);
 		const teamId = Number(f.get('team'));
@@ -100,8 +95,7 @@ export const actions = {
 		return { granted: true };
 	},
 	deleteGrant: async ({ request, params, locals }) => {
-		requireAdmin(locals);
-		const game = await gameByCode(params.code);
+		const game = await requireHost(locals, params.code);
 		await run('DELETE FROM grant_award WHERE id = ? AND game_id = ?', Number((await request.formData()).get('id')), game.id);
 	}
 };

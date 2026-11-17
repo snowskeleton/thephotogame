@@ -83,7 +83,7 @@ export const actions = {
 		);
 		if (!team) return fail(400, { error: 'That team is gone.' });
 		if (game.max_team_size && team.n >= game.max_team_size) return fail(400, { error: 'That team is full.' });
-		await run('INSERT OR REPLACE INTO member (game_id, user_id, team_id) VALUES (?, ?, ?)', game.id, viewer.user.id, team.id);
+		await run('INSERT INTO member (game_id, user_id, team_id) VALUES (?, ?, ?) ON CONFLICT(game_id, user_id) DO UPDATE SET team_id = excluded.team_id', game.id, viewer.user.id, team.id);
 	},
 	newTeam: async ({ request, params, locals, url }) => {
 		const { game, viewer } = await enter(locals, params.code);
@@ -95,6 +95,6 @@ export const actions = {
 		if (!name) return fail(400, { error: 'Give your team a name.' });
 		if (!color) return fail(400, { error: 'Pick a color.' });
 		const id = await insert('INSERT INTO team (game_id, name, color) VALUES (?, ?, ?)', game.id, name, color);
-		await run('INSERT OR REPLACE INTO member (game_id, user_id, team_id) VALUES (?, ?, ?)', game.id, viewer.user.id, id);
+		await run('INSERT INTO member (game_id, user_id, team_id) VALUES (?, ?, ?) ON CONFLICT(game_id, user_id) DO UPDATE SET team_id = excluded.team_id', game.id, viewer.user.id, id);
 	}
 };

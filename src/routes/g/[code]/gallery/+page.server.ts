@@ -14,7 +14,7 @@ export const load = async ({ params, locals, url }) => {
 		filter,
 		photos: await listPhotos(game, viewer, filter),
 		days: [...new Set(everything.map((p) => p.day))],
-		hiddenCount: viewer.isAdmin
+		hiddenCount: viewer.isHost
 			? 0
 			: ((await all<{ n: number }>('SELECT COUNT(*) AS n FROM photo WHERE game_id = ? AND category_id IS NOT NULL', game.id))[0].n - everything.length),
 		categories: await all<{ id: number; name: string }>(

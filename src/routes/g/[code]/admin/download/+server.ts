@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { gameByCode, requireAdmin } from '#lib/server/game.ts';
+import { gameByCode, requireHost } from '#lib/server/game.ts';
 import { all } from '#lib/server/db.ts';
 
 const safe = (s: string) => s.replace(/[\\/:*?"<>|\x00-\x1f]/g, '').trim().slice(0, 60) || 'untitled';
@@ -9,8 +9,7 @@ const safe = (s: string) => s.replace(/[\\/:*?"<>|\x00-\x1f]/g, '').trim().slice
  * zip in the browser: zipping hundreds of MB would blow through a Worker's CPU limit.
  */
 export const GET = async ({ params, locals }) => {
-	requireAdmin(locals);
-	const game = await gameByCode(params.code);
+	const game = await requireHost(locals, params.code);
 	const photos = await all<{ id: number; ext: string; category: string; team: string; who: string }>(
 		`SELECT p.id, p.ext, c.name AS category, t.name AS team, u.name AS who
 		 FROM photo p JOIN category c ON c.id = p.category_id JOIN team t ON t.id = p.team_id

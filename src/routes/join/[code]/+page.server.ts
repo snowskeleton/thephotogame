@@ -2,9 +2,16 @@ import { fail, redirect } from '@sveltejs/kit';
 import { cleanEmail, createUser, findUserByEmail, offerPasskey, sendCode, startSession } from '#lib/server/auth.ts';
 import { run } from '#lib/server/db.ts';
 import { gameByCode, str } from '#lib/server/game.ts';
+import { humanCheck, NOT_HUMAN } from '#lib/server/turnstile.ts';
 
+// Opening the join link also accepts a pending invite to the game.
 const join = async (gameId: number, userId: number) =>
-	await run('INSERT OR IGNORE INTO member (game_id, user_id) VALUES (?, ?)', gameId, userId);
+	await run(
+		`INSERT INTO member (game_id, user_id) VALUES (?, ?)
+		 ON CONFLICT(game_id, user_id) DO UPDATE SET status = 'active'`,
+		gameId,
+		userId
+	);
 
 export const load = async ({ params, locals }) => {
 	const game = await gameByCode(params.code);
@@ -16,7 +23,7 @@ export const load = async ({ params, locals }) => {
 };
 
 export const actions = {
-	default: async ({ request, params, cookies, url }) => {
+	default: async ({ request, params, cookies, url, getClientAddress }) => {
 		const game = await gameByCode(params.code);
 		const f = await request.formData();
 		const name = str(f.get('name'), 40);
@@ -29,9 +36,11 @@ export const actions = {
 			await sendCode(email, url.origin);
 			redirect(303, `/login/code?known=1&email=${encodeURIComponent(email)}&next=/join/${game.code}`);
 		}
+		// Playing doesn't need a confirmed email, so new players are in straight away (unverified).
+		if (!(await humanCheck(f, getClientAddress()))) return fail(400, { error: NOT_HUMAN, name, email });
 		const id = await createUser(email, name);
 		await startSession(cookies, id);
 		await join(game.id, id);
-		redirect(303, offerPasskey(cookies, `/g/${game.code}?welcome=1`));
+		redirect(303, await offerPasskey(id, `/g/${game.code}?welcome=1`));
 	}
 };

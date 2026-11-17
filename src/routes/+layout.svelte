@@ -19,4 +19,14 @@
 	{/if}
 </header>
 
+{#if data.mailMissing}
+	<a class="banner" href="/admin/settings">
+		Email isn’t set up, so sign-in codes and invites only go to the server log. <strong>Set it up ›</strong>
+	</a>
+{/if}
+
 {@render children()}
+
+<style>
+	.banner { display: block; margin: 0 auto; max-width: 720px; box-sizing: border-box; padding: 10px 16px; background: #f5b800; color: #23201c; text-decoration: none; font-size: 0.9rem; }
+</style>

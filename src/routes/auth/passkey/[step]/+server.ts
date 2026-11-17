@@ -7,7 +7,7 @@ import {
 } from '@simplewebauthn/server';
 import { isoBase64URL } from '@simplewebauthn/server/helpers';
 import { all, get, now, run } from '#lib/server/db.ts';
-import { cleanEmail, PASSKEY_SKIP, startSession } from '#lib/server/auth.ts';
+import { cleanEmail, startSession } from '#lib/server/auth.ts';
 
 const CH = 'pg_challenge';
 
@@ -60,7 +60,6 @@ export const POST = async ({ params, request, cookies, locals, url }) => {
 				JSON.stringify(c.transports ?? []),
 				now()
 			);
-			cookies.set(PASSKEY_SKIP, '1', { path: '/', httpOnly: true, sameSite: 'lax', maxAge: 365 * 86400 });
 			return json({ ok: true });
 		}
 		case 'login-options': {
@@ -105,7 +104,6 @@ export const POST = async ({ params, request, cookies, locals, url }) => {
 			if (!result?.verified) error(400, 'That passkey didn’t work. Use an email code instead.');
 			await run('UPDATE passkey SET counter = ? WHERE id = ?', result.authenticationInfo.newCounter, pk.id);
 			await startSession(cookies, pk.user_id);
-			cookies.set(PASSKEY_SKIP, '1', { path: '/', httpOnly: true, sameSite: 'lax', maxAge: 365 * 86400 });
 			return json({ ok: true });
 		}
 	}

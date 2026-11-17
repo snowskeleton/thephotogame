@@ -67,7 +67,7 @@
 	</form>
 {/if}
 
-{#if data.mine || data.isAdmin}
+{#if data.mine || data.isHost}
 	<details class="card">
 		<summary>Edit photo</summary>
 		<div class="stack" style="margin-top:12px">
@@ -76,7 +76,7 @@
 	</details>
 {/if}
 
-{#if data.isAdmin}
+{#if data.isHost}
 	<div class="card stack">
 		<h2 style="margin:0">Showrunner</h2>
 		<form method="POST" action="?/settle" class="row" use:enhance>

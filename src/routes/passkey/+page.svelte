@@ -37,6 +37,7 @@
 			<input type="hidden" name="next" value={data.next} />
 			<button class="block" disabled={busy}>Not now</button>
 		</form>
+		<p class="muted small" style="margin:0">Until you save one, we’ll ask each time you sign in.</p>
 	</div>
 	<form method="POST" bind:this={done} hidden>
 		<input type="hidden" name="next" value={data.next} />

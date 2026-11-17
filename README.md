@@ -20,10 +20,12 @@ npm run db:migrate:remote
 
 Then edit `vars` in `wrangler.jsonc`:
 
-- `ADMIN_EMAIL`: this account becomes the admin when it first signs in. If empty,
-  the very first account created is the admin.
+- `ADMIN_EMAIL`: your address. It becomes the site admin when you first sign in.
+  If empty, the first person to confirm an email becomes the site admin, which
+  with public sign-ups on could be anyone, so set it.
 - `TIME_ZONE`: used for grouping photos by day.
-- `MAIL_FROM`: the sender for sign-in codes and invites.
+- `MAIL_FROM`: the sender for sign-in codes and invites, on your Resend domain.
+- `TURNSTILE_SITE_KEY`: optional, see below.
 
 Email goes out through [Resend](https://resend.com) (its free tier is plenty).
 Verify your sending domain there, then:
@@ -32,8 +34,18 @@ Verify your sending domain there, then:
 npx wrangler secret put RESEND_API_KEY
 ```
 
-Without that key, sign-in codes are only printed to the Worker's log
-(`npx wrangler tail`).
+It asks you to paste the key, stores it encrypted with the Worker, and takes
+effect immediately. Without it, sign-in codes and invites are only printed to
+the Worker's log (`npx wrangler tail`), and the app shows you a banner until
+it's set. **Site admin → Settings** has the same steps and a test button.
+
+To stop bots signing up and spending your email allowance, add a Turnstile
+widget in the Cloudflare dashboard (Turnstile → Add widget, with your site's
+domain), put its site key in `TURNSTILE_SITE_KEY`, and:
+
+```bash
+npx wrangler secret put TURNSTILE_SECRET
+```
 
 Deploy, and again after every change:
 
@@ -47,11 +59,16 @@ dashboard.
 
 ## First use
 
-1. Open the site, tap **Sign in**, and ask for an email code with the
-   `ADMIN_EMAIL` address. That creates the admin account. Set your name under
-   your account.
-2. Create a game under **Admin**, then add categories, teams and awards.
-3. Share the join link or QR from the game's **Admin → Game** screen.
+1. Open the site, tap **Sign in**, enter the `ADMIN_EMAIL` address and your
+   name, and enter the emailed code. That's the site admin account.
+2. Check **Site admin → Settings**: email, public sign-ups and limits.
+3. Create a game from the home page, then add categories, teams and awards
+   under its **Host** tab.
+4. Share the join link or QR from **Host → Game**, or invite people by email
+   from **Host → Teams**. Make co-hosts there too.
+
+Anyone else can sign up the same way and host their own games once their email
+is confirmed (turn this off under Settings).
 
 ## Develop
 
@@ -76,5 +93,11 @@ npx wrangler d1 export thephotogame --remote --output backup.sql
 ```
 
 D1 can also restore the database to any minute in the last 7 days on the free
-plan, 30 on paid (`npx wrangler d1 time-travel`). Photos stay in the R2 bucket; the admin's
+plan, 30 on paid (`npx wrangler d1 time-travel`). Photos stay in the R2 bucket; a host's
 **Download all** button saves every original as a zip.
+
+With strangers uploading, you're hosting their photos. Cloudflare has a free
+CSAM Scanning Tool for sites on your own domain, but it scans images passing
+through Cloudflare's cache and this app serves photos as private, so check
+whether it covers you. A site admin can delete any game from its Host → Game
+screen.

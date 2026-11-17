@@ -1,7 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { qrDataUrl } from '#lib/server/qr.ts';
 import { get, now, run } from '#lib/server/db.ts';
-import { gameByCode, intOrNull, num, requireAdmin, str } from '#lib/server/game.ts';
+import { gameByCode, intOrNull, num, requireHost, str } from '#lib/server/game.ts';
 import { remove } from '#lib/server/images.ts';
 import { all } from '#lib/server/db.ts';
 
@@ -21,8 +21,7 @@ export const load = async ({ params, url }) => {
 
 export const actions = {
 	save: async ({ request, params, locals }) => {
-		requireAdmin(locals);
-		const game = await gameByCode(params.code);
+		const game = await requireHost(locals, params.code);
 		const f = await request.formData();
 		const name = str(f.get('name'), 80);
 		const code = str(f.get('code'), 20).toUpperCase().replace(/[^A-Z0-9-]/g, '');
@@ -49,21 +48,20 @@ export const actions = {
 		return { saved: true };
 	},
 	reveal: async ({ params, locals }) => {
-		requireAdmin(locals);
+		await requireHost(locals, params.code);
 		await run('UPDATE game SET revealed_at = ? WHERE id = ?', now(), (await gameByCode(params.code)).id);
 	},
 	unreveal: async ({ params, locals }) => {
-		requireAdmin(locals);
+		await requireHost(locals, params.code);
 		await run('UPDATE game SET revealed_at = 0 WHERE id = ?', (await gameByCode(params.code)).id);
 	},
 	deleteGame: async ({ request, params, locals }) => {
-		requireAdmin(locals);
-		const game = await gameByCode(params.code);
+		const game = await requireHost(locals, params.code);
 		if (str((await request.formData()).get('confirm')).toUpperCase() !== game.code)
 			return fail(400, { error: 'Type the game code to confirm.' });
 		const ids = await all<{ id: number; ext: string }>('SELECT id, ext FROM photo WHERE game_id = ?', game.id);
 		await run('DELETE FROM game WHERE id = ?', game.id);
 		await remove(ids);
-		redirect(303, '/admin');
+		redirect(303, '/');
 	}
 };

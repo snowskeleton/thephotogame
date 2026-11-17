@@ -35,7 +35,7 @@ export const load = async ({ params, locals, url }) => {
 		categories: await all<{ id: number; name: string }>(
 			'SELECT id, name FROM category WHERE game_id = ? AND (active = 1 OR ? OR id = ?) ORDER BY sort, id',
 			game.id,
-			viewer.isAdmin ? 1 : 0,
+			viewer.isHost ? 1 : 0,
 			category.id
 		)
 	};

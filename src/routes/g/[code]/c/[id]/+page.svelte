@@ -7,7 +7,7 @@
 	import PhotoEditor from '#lib/components/PhotoEditor.svelte';
 	let { data, form } = $props();
 	const open = $derived(data.game.submissions_open && data.category.active);
-	const canEdit = (p: { user_id: number }) => p.user_id === data.user?.id || data.isAdmin;
+	const canEdit = (p: { user_id: number }) => p.user_id === data.user?.id || data.isHost;
 </script>
 
 <a class="muted small" href="/g/{data.game.code}">← Board</a>

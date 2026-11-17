@@ -1,6 +1,6 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { all, batch, get, q, run } from '#lib/server/db.ts';
-import { gameByCode, intOrNull, num, requireAdmin, str } from '#lib/server/game.ts';
+import { gameByCode, intOrNull, num, requireHost, str } from '#lib/server/game.ts';
 import { optionsFor } from '#lib/server/claims.ts';
 import { remove } from '#lib/server/images.ts';
 
@@ -24,7 +24,7 @@ export const load = async ({ params }) => {
 
 export const actions = {
 	save: async ({ request, params, locals }) => {
-		requireAdmin(locals);
+		await requireHost(locals, params.code);
 		const { game, category } = await find(params.code, params.id);
 		const f = await request.formData();
 		const name = str(f.get('name'), 80);
@@ -70,7 +70,7 @@ export const actions = {
 		redirect(303, `/g/${game.code}/admin/categories`);
 	},
 	delete: async ({ params, locals }) => {
-		requireAdmin(locals);
+		await requireHost(locals, params.code);
 		const { game, category } = await find(params.code, params.id);
 		const ids = await all<{ id: number; ext: string }>('SELECT id, ext FROM photo WHERE category_id = ?', category.id);
 		await run('DELETE FROM category WHERE id = ?', category.id);

@@ -13,13 +13,17 @@ export const GET = async ({ params, locals, request }) => {
 	if (!p) error(404, 'Not found');
 	const [game, m] = await Promise.all([
 		get<Game>('SELECT * FROM game WHERE id = ?', p.game_id),
-		get<{ team_id: number | null }>('SELECT team_id FROM member WHERE game_id = ? AND user_id = ?', p.game_id, locals.user.id)
+		get<{ team_id: number | null; role: string }>(
+			"SELECT team_id, role FROM member WHERE game_id = ? AND user_id = ? AND status = 'active'",
+			p.game_id,
+			locals.user.id
+		)
 	]);
-	const isAdmin = !!locals.user.is_admin;
-	if (!m && !isAdmin) error(403, 'Not your game');
+	const isHost = !!locals.user.is_admin || m?.role === 'host';
+	if (!m && !isHost) error(403, 'Not your game');
 	// Unsorted photos stay with their team until they're filed into a category.
-	if (p.category_id === null && !isAdmin && p.team_id !== m?.team_id) error(403, 'Not revealed yet');
-	if (!canSee(game!, { user: locals.user, teamId: m?.team_id ?? null, isAdmin }, p)) error(403, 'Not revealed yet');
+	if (p.category_id === null && !isHost && p.team_id !== m?.team_id) error(403, 'Not revealed yet');
+	if (!canSee(game!, { user: locals.user, teamId: m?.team_id ?? null, isHost }, p)) error(403, 'Not revealed yet');
 
 	const size = params.size;
 	if (size !== 'thumb' && size !== 'large' && size !== 'original') error(404, 'Not found');

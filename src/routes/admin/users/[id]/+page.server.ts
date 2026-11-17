@@ -6,9 +6,9 @@ import { requireAdmin, str } from '#lib/server/game.ts';
 import { remove } from '#lib/server/images.ts';
 import { mailReady } from '#lib/server/mail.ts';
 
-type Person = { id: number; name: string; email: string; is_admin: number; created_at: number; last_seen_at: number | null };
+type Person = { id: number; name: string; email: string; is_admin: number; created_at: number; last_seen_at: number | null; email_verified_at: number | null };
 const person = async (id: string) => {
-	const u = await get<Person>('SELECT id, name, email, is_admin, created_at, last_seen_at FROM user WHERE id = ?', Number(id) || 0);
+	const u = await get<Person>('SELECT id, name, email, is_admin, created_at, last_seen_at, email_verified_at FROM user WHERE id = ?', Number(id) || 0);
 	if (!u) error(404, 'No such person');
 	return u;
 };
@@ -16,8 +16,8 @@ const person = async (id: string) => {
 export const load = async ({ locals, params, url }) => {
 	const me = requireAdmin(locals);
 	const u = await person(params.id);
-	const memberships = await all<{ game_id: number; code: string; name: string; team_id: number | null }>(
-		`SELECT g.id AS game_id, g.code, g.name, m.team_id FROM member m JOIN game g ON g.id = m.game_id
+	const memberships = await all<{ game_id: number; code: string; name: string; team_id: number | null; role: string; status: string }>(
+		`SELECT g.id AS game_id, g.code, g.name, m.team_id, m.role, m.status FROM member m JOIN game g ON g.id = m.game_id
 		 WHERE m.user_id = ? ORDER BY g.created_at DESC`,
 		u.id
 	);
@@ -57,12 +57,21 @@ export const actions = {
 		await run('UPDATE user SET name = ?, email = ?, is_admin = ? WHERE id = ?', name, email, isAdmin, u.id);
 		return { saved: true };
 	},
-	addToGame: async ({ request, locals, params }) => {
-		requireAdmin(locals);
+	addToGame: async ({ request, locals, params, url }) => {
+		const me = requireAdmin(locals);
 		const u = await person(params.id);
-		const game = Number((await request.formData()).get('game'));
-		if (!await get('SELECT 1 FROM game WHERE id = ?', game)) return fail(400, { error: 'Pick a game.' });
-		await run('INSERT OR IGNORE INTO member (game_id, user_id) VALUES (?, ?)', game, u.id);
+		const game = await get<{ id: number; code: string; name: string }>(
+			'SELECT id, code, name FROM game WHERE id = ?',
+			Number((await request.formData()).get('game'))
+		);
+		if (!game) return fail(400, { error: 'Pick a game.' });
+		await run("INSERT OR IGNORE INTO member (game_id, user_id, status) VALUES (?, ?, 'invited')", game.id, u.id);
+		try {
+			await sendInvite(u, url.origin, me, game);
+		} catch {
+			return fail(500, { error: `${u.name} is invited, but the email couldn’t be sent.` });
+		}
+		return { emailed: true };
 	},
 	setTeam: async ({ request, locals, params }) => {
 		requireAdmin(locals);
@@ -88,7 +97,7 @@ export const actions = {
 		const me = requireAdmin(locals);
 		const u = await person(params.id);
 		try {
-			await sendInvite(u, url.origin, me.name);
+			await sendInvite(u, url.origin, me);
 		} catch {
 			return fail(500, { error: 'The email couldn’t be sent. Check the mail settings, or use a sign-in link.' });
 		}

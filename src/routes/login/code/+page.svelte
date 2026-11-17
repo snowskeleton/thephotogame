@@ -1,12 +1,14 @@
 <script lang="ts">
 	let { data, form } = $props();
 	// Keep the email and destination in the address through a wrong code or a resend.
-	const keep = $derived(`&email=${encodeURIComponent(data.email)}&next=${encodeURIComponent(data.next)}${data.known ? '&known' : ''}`);
+	const keep = $derived(`&email=${encodeURIComponent(data.email)}&next=${encodeURIComponent(data.next)}${data.known ? '&known' : ''}${data.verify ? '&verify' : ''}`);
 </script>
 
 <main>
 	<h1>Check your email</h1>
-	{#if data.known}
+	{#if data.verify}
+		<p>Enter the code to confirm this is your email address. Then you can host games.</p>
+	{:else if data.known}
 		<p>You already have an account with that email, so we just need to check it’s you.</p>
 	{/if}
 	<p class="muted">We sent a six-digit code to <strong>{data.email}</strong>.</p>
@@ -20,7 +22,7 @@
 		</label>
 		{#if form?.error}<p class="err">{form.error}</p>{/if}
 		{#if form?.resent}<p class="ok">A new code is on its way. Only the newest one works.</p>{/if}
-		<button class="primary">Sign in</button>
+		<button class="primary">{data.verify ? 'Confirm' : 'Sign in'}</button>
 	</form>
 	<form method="POST" action="?/resend{keep}" class="row">
 		<input type="hidden" name="email" value={data.email} />

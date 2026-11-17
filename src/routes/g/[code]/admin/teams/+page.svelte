@@ -1,6 +1,5 @@
 <script lang="ts">
 	import ColorPicker from '#lib/components/ColorPicker.svelte';
-	import CopyLink from '#lib/components/CopyLink.svelte';
 	import { tv } from '#lib/colors.ts';
 	import { enhance } from '$app/forms';
 	let { data, form } = $props();
@@ -16,13 +15,11 @@
 </p>
 {#if form?.error}<p class="err">{form.error}</p>{/if}
 
-{#if form?.signin}
-	<div class="card stack" style="border-color:var(--accent);border-width:2px">
-		<h2 style="margin:0">Sign-in for {form.signin.name}</h2>
-		<img src={form.signin.qr} alt="Sign-in QR code" style="width:220px;margin:0 auto;border-radius:12px" />
-		<CopyLink value={form.signin.link} label="Sign-in link" shareText={`Sign in to The Photo Game as ${form.signin.name}`} />
-		<p class="muted small" style="margin:0">Scan it with their phone or send them the link. Works once, for 24 hours.</p>
-	</div>
+{#if form?.invited}
+	<p class="ok">
+		Invite sent to {form.invited}. They’re in once they accept it.
+		{#if form.logged}<span class="muted">(Email isn’t set up on this site yet, so it only went to the server log.)</span>{/if}
+	</p>
 {/if}
 
 {#each data.teams as t (t.id)}
@@ -60,6 +57,8 @@
 		<div class="player">
 			<div class="grow">
 				<strong>{p.name}</strong>
+				{#if p.role === 'host'}<span class="pill">host</span>{/if}
+				{#if p.status === 'invited'}<span class="pill warn">invited</span>{/if}
 				<div class="muted small" style="overflow-wrap:anywhere">{p.email} · {p.photos} photos</div>
 			</div>
 			<form method="POST" action="?/assign" use:enhance>
@@ -72,7 +71,15 @@
 			<details class="more">
 				<summary aria-label="More">⋯</summary>
 				<div class="row" style="margin-top:6px">
-					<form method="POST" action="?/signin" use:enhance><input type="hidden" name="user" value={p.id} /><button class="sm">Sign-in QR</button></form>
+					{#if p.status === 'invited'}
+						<form method="POST" action="?/resend" use:enhance><input type="hidden" name="user" value={p.id} /><button class="sm">Resend invite</button></form>
+					{:else}
+						<form method="POST" action="?/setRole" use:enhance>
+							<input type="hidden" name="user" value={p.id} />
+							<input type="hidden" name="role" value={p.role === 'host' ? 'player' : 'host'} />
+							<button class="sm">{p.role === 'host' ? 'Make a player' : 'Make a host'}</button>
+						</form>
+					{/if}
 					<form method="POST" action="?/removePlayer" onsubmit={confirmDel(`Remove ${p.name} from this game? Their photos stay.`)}>
 						<input type="hidden" name="user" value={p.id} /><button class="sm danger">Remove</button></form>
 				</div>
@@ -84,15 +91,18 @@
 </div>
 
 <details class="card">
-	<summary>Add a player yourself</summary>
+	<summary>Invite someone by email</summary>
 	<form method="POST" action="?/addPlayer" class="stack" style="margin-top:12px" use:enhance>
 		<label>Name <input name="name" maxlength="40" /></label>
 		<label>Email <input name="email" type="email" required /></label>
-		<p class="muted small" style="margin:0">They can then sign in with an email code, or with a sign-in QR you make for them.</p>
-		<button class="primary">Add player</button>
+		<p class="muted small" style="margin:0">
+			We email them a link. Accepting it signs them in and helps them save a passkey. Hosts can run the game with you;
+			make someone a host from the ⋯ menu once they’ve joined.
+		</p>
+		<button class="primary">Send invite</button>
 	</form>
 </details>
-<p class="muted small">Edit names, emails and admin rights under <a href="/admin/users">Admin: People</a>.</p>
+{#if data.user?.is_admin}<p class="muted small">Edit names and emails under <a href="/admin/users">Site admin: People</a>.</p>{/if}
 
 <style>
 	.player { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
