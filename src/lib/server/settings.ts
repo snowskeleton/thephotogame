@@ -8,21 +8,31 @@ export const DEFAULTS = {
 	/** How many games one person may create (site admins have no limit). */
 	max_games: '3',
 	/** Photos per game. R2's free tier is 10 GB; a phone photo plus its two copies is ~4–6 MB. */
-	max_photos: '1000'
+	max_photos: '1000',
+	/** Sender for codes and invites, on a domain verified in Resend. Empty: Resend's test sender. */
+	mail_from: ''
 };
-export type Settings = { signups: boolean; maxGames: number; maxPhotos: number };
+export type Settings = { signups: boolean; maxGames: number; maxPhotos: number; mailFrom: string };
 
 export async function settings(): Promise<Settings> {
 	const rows = await all<{ key: string; value: string }>('SELECT key, value FROM setting');
 	const v = { ...DEFAULTS, ...Object.fromEntries(rows.map((r) => [r.key, r.value])) };
-	return { signups: v.signups === '1', maxGames: Number(v.max_games) || 0, maxPhotos: Number(v.max_photos) || 0 };
+	return {
+		signups: v.signups === '1',
+		maxGames: Number(v.max_games) || 0,
+		maxPhotos: Number(v.max_photos) || 0,
+		mailFrom: v.mail_from
+	};
 }
 
-export async function saveSettings(s: Settings) {
-	for (const [key, value] of Object.entries({
-		signups: s.signups ? '1' : '0',
-		max_games: String(s.maxGames),
-		max_photos: String(s.maxPhotos)
-	}))
-		await run('INSERT INTO setting (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value', key, value);
+export async function saveSettings(s: Partial<Settings>) {
+	const values: Record<string, string | undefined> = {
+		signups: s.signups === undefined ? undefined : s.signups ? '1' : '0',
+		max_games: s.maxGames?.toString(),
+		max_photos: s.maxPhotos?.toString(),
+		mail_from: s.mailFrom
+	};
+	for (const [key, value] of Object.entries(values))
+		if (value !== undefined)
+			await run('INSERT INTO setting (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value', key, value);
 }

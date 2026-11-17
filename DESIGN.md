@@ -37,10 +37,17 @@ looks through the day's photos together at night, votes, and wins prizes.
   domain instead of the binding, so photos pass Cloudflare's cache and its CSAM
   scanner; a WAF rule lets only this Worker reach that domain.
 - **SimpleWebAuthn** for passkeys, **Resend** for email.
-- Configuration in `wrangler.jsonc`: `ADMIN_EMAIL`, `TIME_ZONE`, `MAIL_FROM`,
-  `TURNSTILE_SITE_KEY`, plus the `RESEND_API_KEY` and `TURNSTILE_SECRET`
-  secrets. Site settings a site admin changes in the app (public sign-ups,
-  limits) live in the `setting` table.
+- Deployed by Workers Builds from GitHub. `wrangler.jsonc` names the D1
+  database and R2 bucket without IDs, so the first deploy creates them and
+  later deploys reuse them. The app applies `migrations/` itself on the first
+  request each Worker instance serves (`src/lib/server/migrate.ts`), keeping
+  wrangler's `d1_migrations` table, so there's no migrate step.
+- Configuration lives in the dashboard, which deploys leave alone
+  (`keep_vars`): `OWNER_EMAIL` (required), `TIME_ZONE`, `TURNSTILE_SITE_KEY`,
+  `PHOTOS_URL`, and the `RESEND_API_KEY` and `TURNSTILE_SECRET` secrets.
+  Settings a site admin changes in the app (sender address, public sign-ups,
+  limits) live in the `setting` table. Without a sender address, email goes
+  from Resend's test sender, which only reaches the Resend account's owner.
 
 ## Sign-in
 
@@ -65,8 +72,8 @@ Goal: it just works, and everyone has a unique email on file.
 
 An email counts as **confirmed** after entering an emailed code or accepting
 an emailed invite. Hosting a game needs it. Site admin rights also only come
-with a confirmed email: `ADMIN_EMAIL`, or, if that's empty, the first person
-to confirm while the site has no admin.
+with a confirmed email, and only for `OWNER_EMAIL`. Without it set, nobody
+becomes site admin and the site shows a setup notice.
 
 ## Hosts and invites
 

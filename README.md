@@ -9,65 +9,52 @@ All of it fits the free plan for a family-sized game.
 
 ## Deploy
 
-One-time setup (needs a Cloudflare account; `npx wrangler login` first):
+Cloudflare builds and deploys straight from GitHub, and creates the database
+and photo bucket on the first deploy. The app sets up its own tables.
 
-```bash
-npm install
-npx wrangler d1 create thephotogame        # copy the database_id it prints into wrangler.jsonc
-npx wrangler r2 bucket create thephotogame-photos
-npm run db:migrate:remote
-```
+1. In the Cloudflare dashboard: **Workers & Pages → Create → Import a
+   repository**, and pick this repo. Keep the name `thephotogame` (it has to
+   match `wrangler.jsonc`), leave the deploy command as `npx wrangler deploy`,
+   and choose the branch to deploy from. The build command can stay empty:
+   `wrangler deploy` builds the app itself.
+2. Once it's deployed, open the Worker's **Settings → Variables and Secrets**
+   and add:
+   - `OWNER_EMAIL` (type *Text*): your email. That account becomes the site
+     admin when you first sign in. Until it's set, the site shows a setup notice
+     and nobody can be site admin.
+   - `RESEND_API_KEY` (type *Secret*): an API key from
+     [Resend](https://resend.com/api-keys) with sending access.
 
-Then edit `vars` in `wrangler.jsonc`:
+   Saving these redeploys the Worker; nothing needs rebuilding. Later deploys
+   keep them (`keep_vars` is on in `wrangler.jsonc`).
+3. Open the site (`thephotogame.<your-subdomain>.workers.dev`), tap **Sign in**
+   and enter your email and name.
 
-- `ADMIN_EMAIL`: your address. It becomes the site admin when you first sign in.
-  If empty, the first person to confirm an email becomes the site admin, which
-  with public sign-ups on could be anyone, so set it.
-- `TIME_ZONE`: used for grouping photos by day.
-- `MAIL_FROM`: the sender for sign-in codes and invites, on your Resend domain.
-- `TURNSTILE_SITE_KEY`: optional, see below.
-- `PHOTOS_URL`: optional, see [Photo scanning](#photo-scanning).
+   Until you set a sender address, email goes out from Resend's test address,
+   which only delivers to the email your Resend account uses. If `OWNER_EMAIL` is
+   a different address, or you skipped the key, your first code is in the
+   Worker's **Logs** tab in the dashboard instead.
+4. In the app, **Site admin → Settings**: once you've verified a domain in
+   [Resend → Domains](https://resend.com/domains), enter a sender address on it
+   so email reaches everyone. Check the sign-up switch and limits while you're
+   there.
 
-Email goes out through [Resend](https://resend.com) (its free tier is plenty).
-Verify your sending domain there, then:
+Every push to that branch deploys again.
 
-```bash
-npx wrangler secret put RESEND_API_KEY
-```
+**Optional, all under Settings → Variables and Secrets:**
 
-Run it from the project folder: wrangler reads the Worker's name
-(`thephotogame`) from `wrangler.jsonc`, so the secret belongs to this Worker
-only, not your whole account. It asks you to paste the key, stores it
-encrypted, and takes effect immediately. Without it, sign-in codes and invites are only printed to
-the Worker's log (`npx wrangler tail`), and the app shows you a banner until
-it's set. **Site admin → Settings** has the same steps and a test button.
-
-To stop bots signing up and spending your email allowance, add a Turnstile
-widget in the Cloudflare dashboard (Turnstile → Add widget, with your site's
-domain), put its site key in `TURNSTILE_SITE_KEY`, and:
-
-```bash
-npx wrangler secret put TURNSTILE_SECRET
-```
-
-Deploy, and again after every change:
-
-```bash
-npm run deploy
-```
-
-The site comes up on `thephotogame.<you>.workers.dev`. To use your own domain,
-add it under the Worker's **Settings → Domains & Routes** in the Cloudflare
-dashboard.
+- `TIME_ZONE`: for grouping photos by day (default `America/New_York`).
+- `TURNSTILE_SITE_KEY` (text) and `TURNSTILE_SECRET` (secret): a bot check on
+  sign-up, so bots can't spend your email allowance. Make a widget under
+  **Turnstile → Add widget** for your site's domain to get them.
+- `PHOTOS_URL`: see [Photo scanning](#photo-scanning).
+- Your own domain: the Worker's **Settings → Domains & Routes**.
 
 ## First use
 
-1. Open the site, tap **Sign in**, enter the `ADMIN_EMAIL` address and your
-   name, and enter the emailed code. That's the site admin account.
-2. Check **Site admin → Settings**: email, public sign-ups and limits.
-3. Create a game from the home page, then add categories, teams and awards
+1. Create a game from the home page, then add categories, teams and awards
    under its **Host** tab.
-4. Share the join link or QR from **Host → Game**, or invite people by email
+2. Share the join link or QR from **Host → Game**, or invite people by email
    from **Host → Teams**. Make co-hosts there too.
 
 Anyone else can sign up the same way and host their own games once their email
@@ -77,17 +64,17 @@ is confirmed (turn this off under Settings).
 
 ```bash
 npm install
-npm run db:migrate     # creates the local database in .wrangler/
+cp .dev.vars.example .dev.vars   # local stand-ins for the dashboard variables
 npm run dev
 ```
 
 `npm run dev` uses local copies of D1 and R2 kept in `.wrangler/`. Sign-in codes
 are printed to the console. `npm run preview` builds the app and runs it in
-`workerd`, Cloudflare's actual runtime, which is the closer check before deploying.
+`workerd`, Cloudflare's actual runtime, which is the closer check before pushing.
 
-Schema changes go in a new file in `migrations/` (`npx wrangler d1 migrations
-create thephotogame <name>`). Apply it with `npm run db:migrate` locally and
-`npm run db:migrate:remote` in production.
+Schema changes go in a new numbered file in `migrations/`. The app applies any
+it hasn't run yet when it starts, locally and in production, and records them
+in wrangler's `d1_migrations` table.
 
 ## Backups
 
@@ -121,8 +108,8 @@ In the Cloudflare dashboard (with `yourdomain.com` as your domain):
    ```
    Now only this app's Worker can fetch from it, and the app still decides who
    sees which photo. (The free plan includes 5 custom rules.)
-4. Set `PHOTOS_URL` in `wrangler.jsonc` to `https://photos.yourdomain.com` and
-   run `npm run deploy`.
+4. Add a variable `PHOTOS_URL` set to `https://photos.yourdomain.com` under the
+   Worker's **Settings → Variables and Secrets**.
 5. **Caching → Configuration → CSAM Scanning Tool**: turn it on and give it an
    email address for alerts. Matches are blocked where possible and reported to
    you once a day.

@@ -1,20 +1,19 @@
 import { fail } from '@sveltejs/kit';
-import { config } from '#lib/server/db.ts';
 import { requireAdmin } from '#lib/server/game.ts';
-import { mailReady, sendMail } from '#lib/server/mail.ts';
+import { mailFrom, mailReady, sendMail, TEST_SENDER } from '#lib/server/mail.ts';
 import { saveSettings, settings } from '#lib/server/settings.ts';
 import { turnstileKey } from '#lib/server/turnstile.ts';
 
 export const load = async ({ locals }) => {
 	requireAdmin(locals);
-	const env = config();
+	const s = await settings();
+	const from = await mailFrom();
 	return {
-		settings: await settings(),
+		settings: s,
 		mailReady: mailReady(),
-		mailFrom: env.MAIL_FROM || '',
-		mailFromPlaceholder: !env.MAIL_FROM || /@example\.com>?$/.test(env.MAIL_FROM),
-		turnstile: !!turnstileKey(),
-		adminEmail: env.ADMIN_EMAIL || ''
+		mailFrom: from,
+		testSender: from === TEST_SENDER,
+		turnstile: !!turnstileKey()
 	};
 };
 
@@ -26,6 +25,15 @@ export const actions = {
 		const f = await request.formData();
 		await saveSettings({ signups: !!f.get('signups'), maxGames: whole(f.get('max_games')), maxPhotos: whole(f.get('max_photos')) });
 		return { saved: true };
+	},
+	sender: async ({ request, locals }) => {
+		requireAdmin(locals);
+		const v = String((await request.formData()).get('from') ?? '').trim().slice(0, 200);
+		// "photos@yourdomain.com" or "The Photo Game <photos@yourdomain.com>"; empty goes back to the test sender.
+		if (v && !/^([^<>@]+<)?[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+>?$/.test(v))
+			return fail(400, { senderError: 'That doesn’t look like an email address.' });
+		await saveSettings({ mailFrom: v });
+		return { senderSaved: true };
 	},
 	testMail: async ({ locals, url }) => {
 		const me = requireAdmin(locals);

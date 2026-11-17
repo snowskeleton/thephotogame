@@ -19,14 +19,23 @@
 	{/if}
 </header>
 
-{#if data.mailMissing}
+{#if data.noOwner}
+	<p class="banner">
+		Setup: this site has no owner yet. In the Cloudflare dashboard, add a variable named <code>OWNER_EMAIL</code>
+		with your email to this Worker (Settings → Variables and Secrets), then sign in with that address.
+	</p>
+{:else if data.mail === 'missing'}
 	<a class="banner" href="/admin/settings">
-		Email isn’t set up, so sign-in codes and invites only go to the server log. <strong>Set it up ›</strong>
+		Email isn’t set up, so sign-in codes and invites only go to the Worker’s logs. <strong>Set it up ›</strong>
+	</a>
+{:else if data.mail === 'test'}
+	<a class="banner" href="/admin/settings">
+		Email only reaches your own inbox until you set a sender address. <strong>Set it up ›</strong>
 	</a>
 {/if}
 
 {@render children()}
 
 <style>
-	.banner { display: block; margin: 0 auto; max-width: 720px; box-sizing: border-box; padding: 10px 16px; background: #f5b800; color: #23201c; text-decoration: none; font-size: 0.9rem; }
+	.banner { display: block; margin: 0 auto 0; max-width: 720px; box-sizing: border-box; padding: 10px 16px; background: #f5b800; color: #23201c; text-decoration: none; font-size: 0.9rem; }
 </style>

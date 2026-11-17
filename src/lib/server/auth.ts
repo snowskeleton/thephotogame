@@ -50,13 +50,12 @@ export async function findUserByEmail(email: string) {
 	);
 }
 
-/**
- * Whether this email becomes the site admin once it's verified: ADMIN_EMAIL, or, if that's empty,
- * whoever verifies first while there's no admin.
- */
+/** The site owner's email (the OWNER_EMAIL variable), lower-cased, or '' if it isn't set. */
+export const ownerEmail = () => (config().OWNER_EMAIL || '').trim().toLowerCase();
+
+/** Whether this email becomes the site admin once it's confirmed: only OWNER_EMAIL does. */
 export async function becomesAdmin(email: string) {
-	const adminEmail = (config().ADMIN_EMAIL || '').trim().toLowerCase();
-	return adminEmail ? email === adminEmail : !(await get('SELECT 1 FROM user WHERE is_admin = 1 LIMIT 1'));
+	return !!ownerEmail() && email === ownerEmail();
 }
 
 /** New accounts are never admins: admin rights only come with a verified email (see markVerified). */

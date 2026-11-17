@@ -26,7 +26,7 @@ const SELECT = `SELECT p.id, p.category_id, c.name AS category, p.team_id, t.nam
 // D1's "localtime" is UTC, so the calendar day is worked out here, in the game's time zone.
 let dayFormat: Intl.DateTimeFormat | undefined;
 export function dayOf(ms: number): string {
-	dayFormat ??= new Intl.DateTimeFormat('en-CA', { timeZone: config().TIME_ZONE || 'UTC' });
+	dayFormat ??= new Intl.DateTimeFormat('en-CA', { timeZone: config().TIME_ZONE || 'America/New_York' });
 	return dayFormat.format(ms); // en-CA formats as YYYY-MM-DD
 }
 const withDay = (rows: Omit<PhotoRow, 'day'>[]): PhotoRow[] => rows.map((p) => ({ ...p, day: dayOf(p.created_at) }));

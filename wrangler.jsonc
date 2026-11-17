@@ -1,36 +1,25 @@
 {
+	// Deploying: connect this repository to a Worker in the Cloudflare dashboard (Workers Builds).
+	// The database and photo bucket below are created on the first deploy (no IDs needed here), and the
+	// app applies migrations/ itself on startup. See the README for the two settings to add.
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "thephotogame",
 	"main": ".svelte-kit/cloudflare/_worker.js",
 	"compatibility_date": "2026-11-01",
 	"compatibility_flags": ["nodejs_compat"],
+	// `wrangler deploy` builds first, so the dashboard's default deploy command is all it needs.
+	"build": { "command": "npm run build", "watch_dir": "src" },
 	"assets": { "binding": "ASSETS", "directory": ".svelte-kit/cloudflare" },
 	"observability": { "enabled": true },
-	"d1_databases": [
-		{
-			"binding": "DB",
-			"database_name": "thephotogame",
-			// Fill in after `npx wrangler d1 create thephotogame`.
-			"database_id": "00000000-0000-0000-0000-000000000000",
-			"migrations_dir": "migrations"
-		}
-	],
+	"d1_databases": [{ "binding": "DB", "database_name": "thephotogame", "migrations_dir": "migrations" }],
 	"r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "thephotogame-photos" }],
-	"vars": {
-		// This email becomes the site admin once it's confirmed (by email code or invite).
-		// If empty, the first person to confirm an email while there's no site admin becomes it.
-		"ADMIN_EMAIL": "",
-		// Used for grouping photos by day.
-		"TIME_ZONE": "America/New_York",
-		// The sender for codes and invites: an address on a domain verified in Resend.
-		"MAIL_FROM": "The Photo Game <photogame@example.com>",
-		// Cloudflare Turnstile site key (public). With TURNSTILE_SECRET set too, new accounts need the bot check.
-		"TURNSTILE_SITE_KEY": "",
-		// Optional: the R2 bucket's custom domain, like "https://photos.yourdomain.com". Set, photos are
-		// fetched through it so they pass Cloudflare's cache and its CSAM scanner (see the README).
-		"PHOTOS_URL": ""
-	}
-	// Secrets (not here), set with `npx wrangler secret put <NAME>`:
-	//   RESEND_API_KEY    without it, sign-in codes and invites are printed to the log.
-	//   TURNSTILE_SECRET  the Turnstile widget's secret key.
+	// Variables and secrets live in the dashboard (Worker → Settings → Variables and Secrets), and
+	// deploys leave them alone:
+	//   OWNER_EMAIL         (variable, required) your email; it becomes the site admin when you first sign in
+	//   RESEND_API_KEY      (secret) for sending email; without it, codes only appear in the Worker's logs
+	//   TIME_ZONE           (variable, optional) for grouping photos by day; default America/New_York
+	//   TURNSTILE_SITE_KEY  (variable, optional) and TURNSTILE_SECRET (secret): bot check on sign-up
+	//   PHOTOS_URL          (variable, optional) the bucket's custom domain, for CSAM scanning (README)
+	// The sender address for email is set in the app, under Site admin → Settings.
+	"keep_vars": true
 }

@@ -9,32 +9,41 @@
 	<h1>Settings</h1>
 
 	<div class="card stack">
-		<h2 style="margin:0">Email {#if data.mailReady}<span class="pill">set up</span>{:else}<span class="pill warn">not set up</span>{/if}</h2>
-		{#if data.mailReady}
-			<p class="muted small" style="margin:0">Sending through Resend as <strong>{data.mailFrom}</strong>.</p>
-		{:else}
+		<h2 style="margin:0">
+			Email
+			{#if !data.mailReady}<span class="pill warn">not set up</span>
+			{:else if data.testSender}<span class="pill warn">only reaches you</span>
+			{:else}<span class="pill">set up</span>{/if}
+		</h2>
+		{#if !data.mailReady}
 			<p style="margin:0">
-				Sign-in codes and invites are only written to the server log until you add a Resend API key. Nobody else can
-				sign in or accept an invite until then.
+				Sign-in codes and invites only go to the Worker’s logs until you add a Resend API key, so nobody else can
+				sign in or accept an invite yet.
 			</p>
-		{/if}
-		{#if !data.mailReady || data.mailFromPlaceholder}
 			<ol class="small steps">
-				<li>In <a href="https://resend.com/domains" target="_blank" rel="noreferrer">Resend → Domains</a>, add and verify the domain you’ll send from.</li>
 				<li>In <a href="https://resend.com/api-keys" target="_blank" rel="noreferrer">Resend → API Keys</a>, create a key with <em>Sending access</em>.</li>
-				{#if !data.mailReady}
-					<li>On your computer, in the project folder, run this and paste the key when it asks:
-						<pre>npx wrangler secret put RESEND_API_KEY</pre>
-						It’s stored encrypted with the Worker and takes effect straight away, no deploy needed.
-					</li>
-				{/if}
-				{#if data.mailFromPlaceholder}
-					<li>In <code>wrangler.jsonc</code>, set <code>MAIL_FROM</code> to an address on that domain, like
-						<code>"The Photo Game &lt;photos@yourdomain.com&gt;"</code>, then run <code>npm run deploy</code>.</li>
-				{/if}
+				<li>In the Cloudflare dashboard, open the <strong>thephotogame</strong> Worker → <strong>Settings → Variables and Secrets → Add</strong>.
+					Choose type <em>Secret</em>, name it <code>RESEND_API_KEY</code>, paste the key, and deploy.</li>
 				<li>Come back here and send yourself a test.</li>
 			</ol>
+		{:else if data.testSender}
+			<p style="margin:0">
+				Email goes out from Resend’s test address, which only delivers to the email on your Resend account. To reach
+				everyone, verify a domain in <a href="https://resend.com/domains" target="_blank" rel="noreferrer">Resend → Domains</a>
+				and enter an address on it below.
+			</p>
+		{:else}
+			<p class="muted small" style="margin:0">Sending through Resend as <strong>{data.mailFrom}</strong>.</p>
 		{/if}
+		<form method="POST" action="?/sender" class="stack" use:enhance>
+			<label>
+				Send email from
+				<input name="from" defaultValue={data.settings.mailFrom} placeholder="The Photo Game <photos@yourdomain.com>" maxlength="200" />
+			</label>
+			{#if form?.senderError}<p class="err">{form.senderError}</p>{/if}
+			{#if form?.senderSaved}<p class="ok">Saved.</p>{/if}
+			<button>Save sender</button>
+		</form>
 		<form method="POST" action="?/testMail" use:enhance>
 			<button disabled={!data.mailReady}>Send a test email to me</button>
 		</form>
@@ -62,21 +71,14 @@
 		<h2 style="margin:0">Bot check {#if data.turnstile}<span class="pill">on</span>{:else}<span class="pill warn">off</span>{/if}</h2>
 		<p class="muted small" style="margin:0">
 			Cloudflare Turnstile checks that new accounts are made by people, so bots can’t use up your free email
-			allowance. {#if !data.turnstile}To turn it on, add a widget under Turnstile in the Cloudflare dashboard, put its site key
-			in <code>TURNSTILE_SITE_KEY</code> in <code>wrangler.jsonc</code> and deploy, then run
-			<code>npx wrangler secret put TURNSTILE_SECRET</code> with its secret key.{/if}
+			allowance. {#if !data.turnstile}To turn it on, add a widget under Turnstile in the Cloudflare dashboard, then add its keys to
+			this Worker under Settings → Variables and Secrets: the site key as a variable named <code>TURNSTILE_SITE_KEY</code>
+			and the secret key as a secret named <code>TURNSTILE_SECRET</code>.{/if}
 		</p>
 	</div>
 
-	{#if !data.adminEmail}
-		<p class="muted small">
-			Tip: set <code>ADMIN_EMAIL</code> in <code>wrangler.jsonc</code> to your address. While it’s empty, a site with no
-			admin makes the first person to confirm an email the admin.
-		</p>
-	{/if}
 </main>
 
 <style>
 	.steps { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
-	pre { margin: 6px 0; padding: 8px 10px; background: var(--line); border-radius: 8px; overflow-x: auto; user-select: all; }
-</style>
+	</style>
