@@ -17,8 +17,9 @@ export const actions = {
 		const next = safeNext(f.get('next'));
 		const typed = String(f.get('email') ?? '');
 		if (!email) return fail(400, { error: 'That email doesn’t look right.', email: typed, needName: false, name: '' });
+		let sent: boolean;
 		if (await findUserByEmail(email)) {
-			await sendCode(email, url.origin);
+			sent = await sendCode(email, url.origin);
 		} else {
 			// A new account. It's only made once they enter the emailed code, so it starts out verified.
 			// The site admin can always sign up this way, even with public sign-ups off, to bootstrap the site.
@@ -28,8 +29,8 @@ export const actions = {
 			if (!name) return fail(400, { needName: true, email: typed, name: '', error: f.has('name') ? 'Tell us your name.' : '' });
 			if (!(await humanCheck(f, getClientAddress())))
 				return fail(400, { needName: true, email: typed, name, error: NOT_HUMAN });
-			await sendCode(email, url.origin, name);
+			sent = await sendCode(email, url.origin, name);
 		}
-		redirect(303, `/login/code?email=${encodeURIComponent(email)}&next=${encodeURIComponent(next)}`);
+		redirect(303, `/login/code?email=${encodeURIComponent(email)}&next=${encodeURIComponent(next)}${sent ? '' : '&unsent'}`);
 	}
 };

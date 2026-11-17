@@ -37,7 +37,7 @@ export const actions = {
 	},
 	verify: async ({ locals, url }) => {
 		if (!locals.user) redirect(303, '/login');
-		await sendCode(locals.user.email, url.origin);
-		redirect(303, `/login/code?verify=1&email=${encodeURIComponent(locals.user.email)}&next=/`);
+		const sent = await sendCode(locals.user.email, url.origin);
+		redirect(303, `/login/code?verify=1&email=${encodeURIComponent(locals.user.email)}&next=/${sent ? '' : '&unsent'}`);
 	}
 };

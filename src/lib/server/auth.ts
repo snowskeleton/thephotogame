@@ -70,8 +70,11 @@ export async function markVerified(userId: number) {
 	if (u && !u.is_admin && (await becomesAdmin(u.email))) await run('UPDATE user SET is_admin = 1 WHERE id = ?', userId);
 }
 
-/** Emails a six-digit sign-in code. `name` is kept so a brand new account can be created on verify. */
-export async function sendCode(email: string, origin: string, name?: string) {
+/**
+ * Emails a six-digit sign-in code. `name` is kept so a brand new account can be created on verify.
+ * Returns false if the email couldn't be sent (the code is in the Worker's logs then); the code still works.
+ */
+export async function sendCode(email: string, origin: string, name?: string): Promise<boolean> {
 	const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
 	await run('DELETE FROM login_code WHERE email = ? OR expires_at < ?', email, now());
 	await run(
@@ -81,11 +84,16 @@ export async function sendCode(email: string, origin: string, name?: string) {
 		name ?? null,
 		now() + 15 * 60_000
 	);
-	await sendMail(
-		email,
-		`${code} is your Photo Game code`,
-		`Your sign-in code for The Photo Game is:\n\n    ${code}\n\nIt works for 15 minutes. Enter it at ${origin}/login/code\n\nIf you didn't ask for this, ignore this email.`
-	);
+	try {
+		await sendMail(
+			email,
+			`${code} is your Photo Game code`,
+			`Your sign-in code for The Photo Game is:\n\n    ${code}\n\nIt works for 15 minutes. Enter it at ${origin}/login/code\n\nIf you didn't ask for this, ignore this email.`
+		);
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 export async function checkCode(email: string, code: string): Promise<{ ok: boolean; name: string | null }> {

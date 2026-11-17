@@ -6,7 +6,8 @@ export const load = async ({ url }) => ({
 	email: url.searchParams.get('email') ?? '',
 	next: safeNext(url.searchParams.get('next')),
 	known: url.searchParams.has('known'),
-	verify: url.searchParams.has('verify')
+	verify: url.searchParams.has('verify'),
+	unsent: url.searchParams.has('unsent')
 });
 
 export const actions = {
@@ -27,12 +28,13 @@ export const actions = {
 	resend: async ({ request, url }) => {
 		const email = cleanEmail((await request.formData()).get('email'));
 		if (!email) return { resent: true };
-		if (await findUserByEmail(email)) await sendCode(email, url.origin);
+		let sent = true;
+		if (await findUserByEmail(email)) sent = await sendCode(email, url.origin);
 		else {
 			// Still signing up: only resend if a sign-up code was already sent (it passed the bot check).
 			const pending = await get<{ name: string }>('SELECT name FROM login_code WHERE email = ? AND name IS NOT NULL', email);
-			if (pending) await sendCode(email, url.origin, pending.name);
+			if (pending) sent = await sendCode(email, url.origin, pending.name);
 		}
-		return { resent: true };
+		return sent ? { resent: true } : { unsent: true };
 	}
 };

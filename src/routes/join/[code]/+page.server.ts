@@ -33,8 +33,8 @@ export const actions = {
 
 		if (await findUserByEmail(email)) {
 			// Existing account: prove it's you before joining as them.
-			await sendCode(email, url.origin);
-			redirect(303, `/login/code?known=1&email=${encodeURIComponent(email)}&next=/join/${game.code}`);
+			const sent = await sendCode(email, url.origin);
+			redirect(303, `/login/code?known=1&email=${encodeURIComponent(email)}&next=/join/${game.code}${sent ? '' : '&unsent'}`);
 		}
 		// Playing doesn't need a confirmed email, so new players are in straight away (unverified).
 		if (!(await humanCheck(f, getClientAddress()))) return fail(400, { error: NOT_HUMAN, name, email });

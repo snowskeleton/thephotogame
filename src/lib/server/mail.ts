@@ -26,5 +26,10 @@ export async function sendMail(to: string, subject: string, text: string) {
 		headers: { authorization: `Bearer ${RESEND_API_KEY}`, 'content-type': 'application/json' },
 		body: JSON.stringify({ from: await mailFrom(), to, subject, text })
 	});
-	if (!res.ok) throw new Error(`Mail failed: ${res.status} ${await res.text()}`);
+	if (!res.ok) {
+		// Log the message too, so a site admin can still pass on a code or link from the Worker's logs.
+		const why = `Mail failed: ${res.status} ${await res.text()}`;
+		console.error(`[mail failed] to=${to} subject=${subject}\n${why}\n${text}`);
+		throw new Error(why);
+	}
 }
