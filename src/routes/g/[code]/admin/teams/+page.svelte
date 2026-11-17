@@ -99,7 +99,12 @@
 			We email them a link. Accepting it signs them in and helps them save a passkey. Hosts can run the game with you;
 			make someone a host from the ⋯ menu once they’ve joined.
 		</p>
-		<button class="primary">Send invite</button>
+		{#if data.invitesLeft < 999}
+			<p class="muted small" style="margin:0">
+				{data.invitesLeft} of {data.invitesPerDay} invites left today. The join link and QR code on the Game screen have no limit.
+			</p>
+		{/if}
+		<button class="primary" disabled={data.invitesLeft === 0}>Send invite</button>
 	</form>
 </details>
 {#if data.user?.is_admin}<p class="muted small">Edit names and emails under <a href="/admin/users">Site admin: People</a>.</p>{/if}

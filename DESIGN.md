@@ -33,6 +33,9 @@ looks through the day's photos together at night, votes, and wins prizes.
   The phone makes those two copies before uploading (`src/lib/resize.ts`),
   since Workers can't run sharp. The admin's "download all" zip is built in the
   browser too, to stay inside a Worker's CPU limit.
+  With `PHOTOS_URL` set, the photo route fetches through the bucket's custom
+  domain instead of the binding, so photos pass Cloudflare's cache and its CSAM
+  scanner; a WAF rule lets only this Worker reach that domain.
 - **SimpleWebAuthn** for passkeys, **Resend** for email.
 - Configuration in `wrangler.jsonc`: `ADMIN_EMAIL`, `TIME_ZONE`, `MAIL_FROM`,
   `TURNSTILE_SITE_KEY`, plus the `RESEND_API_KEY` and `TURNSTILE_SECRET`
@@ -76,6 +79,10 @@ it up), which signs them in, confirms their email, adds them to the game and
 offers a passkey. Opening the game's join link also accepts. Nobody but a
 site admin can make a sign-in link for someone else, so a host can't sign in
 as a player who has an account elsewhere on the site.
+
+A host can send 20 invite emails per 24 hours (resends count; site admins have
+no cap), so a stranger's account can't spend the site's email allowance. The
+join link and QR code have no limit.
 
 Limits a site admin sets: games one person can create (default 3) and photos
 per game (default 1000). Site admins and their games aren't limited.

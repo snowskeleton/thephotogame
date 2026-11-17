@@ -5,7 +5,7 @@ import { now } from '#lib/server/db.ts';
 // Accepting is a button (a POST), so email scanners that open links can't use the invite up.
 export const load = async ({ params, locals }) => {
 	const inv = await findInvite(params.token);
-	if (!inv || inv.expires_at < now()) return { invite: null };
+	if (!inv || inv.used_at || inv.expires_at < now()) return { invite: null };
 	return {
 		invite: { name: inv.name, email: inv.email, game: inv.game, from: inv.from },
 		otherUser: locals.user && locals.user.id !== inv.user_id ? locals.user.name : null

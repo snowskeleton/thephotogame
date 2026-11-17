@@ -1,11 +1,11 @@
 import { fail } from '@sveltejs/kit';
-import { cleanEmail, createUser, findUserByEmail, sendInvite } from '#lib/server/auth.ts';
+import { cleanEmail, createUser, findUserByEmail, INVITES_PER_DAY, invitesLeft, sendInvite } from '#lib/server/auth.ts';
 import { mailReady } from '#lib/server/mail.ts';
 import { all, get, insert, run } from '#lib/server/db.ts';
 import { validColor } from '#lib/colors.ts';
 import { gameByCode, requireHost, str } from '#lib/server/game.ts';
 
-export const load = async ({ params }) => {
+export const load = async ({ params, locals }) => {
 	const game = await gameByCode(params.code);
 	return {
 		teams: await all<{ id: number; name: string; color: string; members: number; photos: number }>(
@@ -15,6 +15,8 @@ export const load = async ({ params }) => {
 			game.id
 		),
 		mailReady: mailReady(),
+		invitesLeft: Math.min(await invitesLeft(locals.user!), 999),
+		invitesPerDay: INVITES_PER_DAY,
 		players: await all<{ id: number; name: string; email: string; team_id: number | null; role: string; status: string; photos: number }>(
 			`SELECT u.id, u.name, u.email, m.team_id, m.role, m.status,
 				(SELECT COUNT(*) FROM photo p WHERE p.user_id = u.id AND p.game_id = m.game_id) AS photos
@@ -64,6 +66,7 @@ export const actions = {
 		const email = cleanEmail(f.get('email'));
 		const name = str(f.get('name'), 40);
 		if (!email) return fail(400, { error: 'That email doesn’t look right.' });
+		if (!(await invitesLeft(locals.user!))) return fail(429, { error: TOO_MANY });
 		const user = await findUserByEmail(email);
 		if (!user && !name) return fail(400, { error: 'New players need a name.' });
 		const id = user?.id ?? (await createUser(email, name));
@@ -81,6 +84,7 @@ export const actions = {
 			Number((await request.formData()).get('user'))
 		);
 		if (!u) return fail(400, { error: 'That person isn’t waiting on an invite.' });
+		if (!(await invitesLeft(locals.user!))) return fail(429, { error: TOO_MANY });
 		return invite(game, u, locals.user!, url.origin);
 	},
 	setRole: async ({ request, params, locals }) => {
@@ -99,6 +103,8 @@ export const actions = {
 		await run('DELETE FROM member WHERE game_id = ? AND user_id = ?', game.id, userId);
 	}
 };
+
+const TOO_MANY = `You’ve sent ${INVITES_PER_DAY} invites in the last day, the most allowed. Share the game’s join link or QR code instead; any number of people can use it.`;
 
 const hosts = async (gameId: number) =>
 	(await get<{ n: number }>("SELECT COUNT(*) AS n FROM member WHERE game_id = ? AND role = 'host' AND status = 'active'", gameId))!.n;

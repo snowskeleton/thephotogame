@@ -26,6 +26,7 @@ Then edit `vars` in `wrangler.jsonc`:
 - `TIME_ZONE`: used for grouping photos by day.
 - `MAIL_FROM`: the sender for sign-in codes and invites, on your Resend domain.
 - `TURNSTILE_SITE_KEY`: optional, see below.
+- `PHOTOS_URL`: optional, see [Photo scanning](#photo-scanning).
 
 Email goes out through [Resend](https://resend.com) (its free tier is plenty).
 Verify your sending domain there, then:
@@ -34,8 +35,10 @@ Verify your sending domain there, then:
 npx wrangler secret put RESEND_API_KEY
 ```
 
-It asks you to paste the key, stores it encrypted with the Worker, and takes
-effect immediately. Without it, sign-in codes and invites are only printed to
+Run it from the project folder: wrangler reads the Worker's name
+(`thephotogame`) from `wrangler.jsonc`, so the secret belongs to this Worker
+only, not your whole account. It asks you to paste the key, stores it
+encrypted, and takes effect immediately. Without it, sign-in codes and invites are only printed to
 the Worker's log (`npx wrangler tail`), and the app shows you a banner until
 it's set. **Site admin → Settings** has the same steps and a test button.
 
@@ -96,8 +99,34 @@ D1 can also restore the database to any minute in the last 7 days on the free
 plan, 30 on paid (`npx wrangler d1 time-travel`). Photos stay in the R2 bucket; a host's
 **Download all** button saves every original as a zip.
 
-With strangers uploading, you're hosting their photos. Cloudflare has a free
-CSAM Scanning Tool for sites on your own domain, but it scans images passing
-through Cloudflare's cache and this app serves photos as private, so check
-whether it covers you. A site admin can delete any game from its Host → Game
-screen.
+A site admin can delete any game from its Host → Game screen.
+
+## Photo scanning
+
+With strangers uploading, you're hosting their photos, so it's worth turning on
+Cloudflare's free CSAM Scanning Tool. It checks images as they pass through
+Cloudflare's cache, so the app has to fetch photos through a cached address
+instead of straight from the bucket. This needs the site on your own domain.
+In the Cloudflare dashboard (with `yourdomain.com` as your domain):
+
+1. Put the app on your domain: the Worker's **Settings → Domains & Routes**,
+   for example `game.yourdomain.com`.
+2. Give the bucket an address: **R2 → thephotogame-photos → Settings →
+   Custom Domains**, connect `photos.yourdomain.com`. That makes the bucket
+   reachable at that address, so close it in the next step.
+3. **Security → WAF → Custom rules → Create rule**, choose *Edit expression*,
+   and paste this, with action **Block**:
+   ```
+   (http.host eq "photos.yourdomain.com" and cf.worker.upstream_zone ne "yourdomain.com")
+   ```
+   Now only this app's Worker can fetch from it, and the app still decides who
+   sees which photo. (The free plan includes 5 custom rules.)
+4. Set `PHOTOS_URL` in `wrangler.jsonc` to `https://photos.yourdomain.com` and
+   run `npm run deploy`.
+5. **Caching → Configuration → CSAM Scanning Tool**: turn it on and give it an
+   email address for alerts. Matches are blocked where possible and reported to
+   you once a day.
+
+Then check: opening `https://photos.yourdomain.com/photos/1/thumb.jpg` in a
+browser should be blocked, while photos in the app still load. Leave
+`PHOTOS_URL` empty to go back to reading the bucket directly.

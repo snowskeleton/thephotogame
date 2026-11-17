@@ -127,6 +127,19 @@ export async function useHandoff(token: string): Promise<number | null> {
 }
 
 const INVITE_DAYS = 7;
+/** Invite emails one host may send per 24 hours (site admins aren't limited). Join links and QR codes have no limit. */
+export const INVITES_PER_DAY = 20;
+
+/** How many more invites this person can send right now. */
+export async function invitesLeft(user: { id: number; is_admin: number }): Promise<number> {
+	if (user.is_admin) return Infinity;
+	const sent = (await get<{ n: number }>(
+		'SELECT COUNT(*) AS n FROM invite WHERE invited_by = ? AND created_at > ?',
+		user.id,
+		now() - 86400_000
+	))!.n;
+	return Math.max(0, INVITES_PER_DAY - sent);
+}
 
 /**
  * Emails an invite link (good for a week). Opening it signs the person in, counts as verifying their email
@@ -141,11 +154,12 @@ export async function sendInvite(
 	const token = randomBytes(24).toString('base64url');
 	await run('DELETE FROM invite WHERE expires_at < ?', now());
 	await run(
-		'INSERT INTO invite (token_hash, user_id, game_id, invited_by, expires_at) VALUES (?, ?, ?, ?, ?)',
+		'INSERT INTO invite (token_hash, user_id, game_id, invited_by, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)',
 		sha(token),
 		user.id,
 		game?.id ?? null,
 		from.id,
+		now(),
 		now() + INVITE_DAYS * 86400_000
 	);
 	const link = `${origin}/invite/${token}`;
@@ -156,11 +170,11 @@ export async function sendInvite(
 	);
 }
 
-export type Invite = { user_id: number; game_id: number | null; expires_at: number; name: string; email: string; game: string | null; code: string | null; from: string | null };
+export type Invite = { user_id: number; game_id: number | null; expires_at: number; used_at: number | null; name: string; email: string; game: string | null; code: string | null; from: string | null };
 
 export const findInvite = (token: string) =>
 	get<Invite>(
-		`SELECT i.user_id, i.game_id, i.expires_at, u.name, u.email, g.name AS game, g.code, f.name AS "from"
+		`SELECT i.user_id, i.game_id, i.expires_at, i.used_at, u.name, u.email, g.name AS game, g.code, f.name AS "from"
 		 FROM invite i JOIN user u ON u.id = i.user_id LEFT JOIN game g ON g.id = i.game_id LEFT JOIN user f ON f.id = i.invited_by
 		 WHERE i.token_hash = ?`,
 		sha(token)
@@ -168,9 +182,10 @@ export const findInvite = (token: string) =>
 
 /** Uses up an invite: the person's email counts as verified and they join the game. Returns the invite, or null. */
 export async function acceptInvite(token: string): Promise<Invite | null> {
-	const inv = await findInvite(token);
-	await run('DELETE FROM invite WHERE token_hash = ?', sha(token));
-	if (!inv || inv.expires_at < now()) return null;
+	// Marking it used in the same statement that checks it means two taps can't both accept.
+	const used = await get('UPDATE invite SET used_at = ? WHERE token_hash = ? AND used_at IS NULL AND expires_at > ? RETURNING 1', now(), sha(token), now());
+	const inv = used && (await findInvite(token));
+	if (!inv) return null;
 	await markVerified(inv.user_id);
 	if (inv.game_id)
 		await run(

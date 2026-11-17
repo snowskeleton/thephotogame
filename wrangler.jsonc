@@ -25,7 +25,10 @@
 		// The sender for codes and invites: an address on a domain verified in Resend.
 		"MAIL_FROM": "The Photo Game <photogame@example.com>",
 		// Cloudflare Turnstile site key (public). With TURNSTILE_SECRET set too, new accounts need the bot check.
-		"TURNSTILE_SITE_KEY": ""
+		"TURNSTILE_SITE_KEY": "",
+		// Optional: the R2 bucket's custom domain, like "https://photos.yourdomain.com". Set, photos are
+		// fetched through it so they pass Cloudflare's cache and its CSAM scanner (see the README).
+		"PHOTOS_URL": ""
 	}
 	// Secrets (not here), set with `npx wrangler secret put <NAME>`:
 	//   RESEND_API_KEY    without it, sign-in codes and invites are printed to the log.
