@@ -1,7 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { qrDataUrl } from '#lib/server/qr.ts';
 import { get, now, run } from '#lib/server/db.ts';
-import { gameByCode, intOrNull, num, requireHost, str } from '#lib/server/game.ts';
+import { cleanCode, gameByCode, intOrNull, num, randomCode, requireHost, str } from '#lib/server/game.ts';
 import { remove } from '#lib/server/images.ts';
 import { all } from '#lib/server/db.ts';
 
@@ -24,15 +24,11 @@ export const actions = {
 		const game = await requireHost(locals, params.code);
 		const f = await request.formData();
 		const name = str(f.get('name'), 80);
-		const code = str(f.get('code'), 20).toUpperCase().replace(/[^A-Z0-9-]/g, '');
-		if (!name || !code) return fail(400, { error: 'The game needs a name and a code.' });
-		if (await get('SELECT 1 FROM game WHERE code = ? AND id != ?', code, game.id))
-			return fail(400, { error: 'Another game already uses that code.' });
+		if (!name) return fail(400, { error: 'The game needs a name.' });
 		await run(
-			`UPDATE game SET name = ?, code = ?, visibility = ?, team_mode = ?, max_team_size = ?, submissions_open = ?,
+			`UPDATE game SET name = ?, visibility = ?, team_mode = ?, max_team_size = ?, submissions_open = ?,
 				doubt_limit = ?, bingo = ?, bingo_cols = ?, bingo_line_points = ?, bingo_board_points = ? WHERE id = ?`,
 			name,
-			code,
 			f.get('visibility') === 'open' ? 'open' : 'hidden',
 			f.get('team_mode') === 'self' ? 'self' : 'admin',
 			intOrNull(f.get('max_team_size')),
@@ -44,8 +40,14 @@ export const actions = {
 			num(f.get('bingo_board_points')),
 			game.id
 		);
-		if (code !== game.code) redirect(303, `/g/${code}/admin`);
 		return { saved: true };
+	},
+	// A fresh code and join link, for when the old one got out. Old links stop working.
+	newCode: async ({ params, locals }) => {
+		const game = await requireHost(locals, params.code);
+		const code = await randomCode();
+		await run('UPDATE game SET code = ? WHERE id = ?', code, game.id);
+		redirect(303, `/g/${code}/admin?newcode=1`);
 	},
 	reveal: async ({ params, locals }) => {
 		await requireHost(locals, params.code);
@@ -57,7 +59,7 @@ export const actions = {
 	},
 	deleteGame: async ({ request, params, locals }) => {
 		const game = await requireHost(locals, params.code);
-		if (str((await request.formData()).get('confirm')).toUpperCase() !== game.code)
+		if (cleanCode((await request.formData()).get('confirm')) !== game.code)
 			return fail(400, { error: 'Type the game code to confirm.' });
 		const ids = await all<{ id: number; ext: string }>('SELECT id, ext FROM photo WHERE game_id = ?', game.id);
 		await run('DELETE FROM game WHERE id = ?', game.id);

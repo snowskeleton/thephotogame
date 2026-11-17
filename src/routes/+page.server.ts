@@ -1,7 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { all, get } from '#lib/server/db.ts';
 import { sendCode } from '#lib/server/auth.ts';
-import { createGame, hostingCheck, str } from '#lib/server/game.ts';
+import { cleanCode, createGame, hostingCheck, str } from '#lib/server/game.ts';
 import { settings } from '#lib/server/settings.ts';
 
 export const load = async ({ locals }) => {
@@ -22,9 +22,9 @@ export const load = async ({ locals }) => {
 
 export const actions = {
 	join: async ({ request }) => {
-		const code = String((await request.formData()).get('code') ?? '').trim();
-		const g = await get<{ code: string }>('SELECT code FROM game WHERE code = ?', code);
-		if (!g) return fail(400, { error: `No game with the code “${code}”.` });
+		const code = cleanCode((await request.formData()).get('code'));
+		const g = code ? await get<{ code: string }>('SELECT code FROM game WHERE code = ?', code) : undefined;
+		if (!g) return fail(400, { error: 'No game has that code. Check it, or ask the host for the join link.' });
 		redirect(303, `/join/${g.code}`);
 	},
 	newGame: async ({ request, locals }) => {

@@ -78,13 +78,23 @@ export async function hostingCheck(user: User): Promise<{ ok: true } | { ok: fal
 	return { ok: true };
 }
 
-const randomCode = async () => {
-	const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+// Join codes: 10 characters from 31 that can't be mixed up (no 0/O, 1/I/L), about 8×10^14 possibilities,
+// so a code can't be found by guessing. Anyone with the code can join, so it's as good as an invite.
+const CODE_LETTERS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const CODE_LENGTH = 10;
+
+/** A code as typed: upper case, with spaces and dashes dropped. */
+export const cleanCode = (v: unknown) => String(v ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 40);
+
+export async function randomCode(): Promise<string> {
 	for (;;) {
-		const code = Array.from({ length: 4 }, () => letters[Math.floor(Math.random() * letters.length)]).join('');
+		// 248 is the largest multiple of 31 under 256, so every letter is equally likely.
+		const bytes = crypto.getRandomValues(new Uint8Array(CODE_LENGTH * 2)).filter((b) => b < 248);
+		if (bytes.length < CODE_LENGTH) continue;
+		const code = Array.from(bytes.slice(0, CODE_LENGTH), (b) => CODE_LETTERS[b % CODE_LETTERS.length]).join('');
 		if (!(await get('SELECT 1 FROM game WHERE code = ?', code))) return code;
 	}
-};
+}
 
 /** Creates a game with its creator as host. Check hostingCheck first. */
 export async function createGame(user: User, name: string): Promise<string> {

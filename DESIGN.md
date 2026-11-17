@@ -91,6 +91,11 @@ A host can send 20 invite emails per 24 hours (resends count; site admins have
 no cap), so a stranger's account can't spend the site's email allowance. The
 join link and QR code have no limit.
 
+Join codes are 10 random characters from 31 that can't be confused (no
+0/O or 1/I/L), so they can't be guessed; typing ignores case, spaces and
+dashes. Hosts can't pick their own code, but can make a new one if a link gets
+out, which stops the old code and link working.
+
 Limits a site admin sets: games one person can create (default 3) and photos
 per game (default 1000). Site admins and their games aren't limited.
 

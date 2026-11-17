@@ -54,14 +54,14 @@
 	<form method="POST" action="?/save" class="card stack" use:enhance>
 		<h2 style="margin:0">Sign-ups &amp; limits</h2>
 		<label class="check">
-			<input type="checkbox" name="signups" checked={s.signups} />
+			<input type="checkbox" name="signups" defaultChecked={s.signups} />
 			Public sign-ups: anyone can make an account from the sign-in page and, once they’ve confirmed their email, host games
 		</label>
 		<p class="muted small" style="margin:0">
 			Off: only site admins create games, and only people with an account or a game’s join link can get in.
 		</p>
-		<label>Games one person can create <input name="max_games" type="number" min="0" value={s.maxGames} /></label>
-		<label>Photos per game <input name="max_photos" type="number" min="0" value={s.maxPhotos} /></label>
+		<label>Games one person can create <input name="max_games" type="number" min="0" defaultValue={s.maxGames} /></label>
+		<label>Photos per game <input name="max_photos" type="number" min="0" defaultValue={s.maxPhotos} /></label>
 		<p class="muted small" style="margin:0">Site admins, and games they create, aren’t limited. R2’s free tier holds about 10 GB, roughly 2,000 phone photos.</p>
 		{#if form?.saved}<p class="ok">Saved.</p>{/if}
 		<button class="primary">Save</button>

@@ -33,7 +33,7 @@
 		<label>Name <input name="name" defaultValue={u.name} required maxlength="40" /></label>
 		<label>Email <input name="email" type="email" defaultValue={u.email} required /></label>
 		<label class="check">
-			<input type="checkbox" name="is_admin" checked={!!u.is_admin} disabled={data.isMe} />
+			<input type="checkbox" name="is_admin" defaultChecked={!!u.is_admin} disabled={data.isMe} />
 			Site admin (can run every game, manage people and change settings)
 		</label>
 		{#if data.isMe}<p class="muted small" style="margin:0">This is you. Another site admin has to change your site admin rights.</p>{/if}
