@@ -8,6 +8,7 @@ import { optionsFor } from '#lib/server/claims.ts';
 import { actorFromToken, type Actor, type Scope } from '#lib/server/perms.ts';
 import { scoreGame } from '#lib/server/scoring.ts';
 import { saveSettings, settings } from '#lib/server/settings.ts';
+import { listEvents, logEvent, summary } from '#lib/server/log.ts';
 
 /**
  * JSON API for API keys (see docs/API.md). Authenticated only by `Authorization: Bearer pgk_...`;
@@ -71,6 +72,17 @@ const routes: Route[] = [
 		user: { id: a.user.id, name: a.user.name, site_admin: !!a.user.is_admin },
 		key: { name: a.key.name, scopes: [...a.scopes], game_id: a.gameId, expires_at: a.key.expires_at }
 	}) },
+
+	// ---- logs: server errors, failed sign-up checks, email failures, browser errors (site-wide keys only)
+	{ method: 'GET', path: 'logs', scope: 'logs:read', run: async ({ url }) => {
+		const qs = url.searchParams;
+		const since = qs.get('since') ?? '';
+		// `since` is a timestamp in ms, or a window like 30m, 6h, 2d.
+		const m = since.match(/^(\d+)([mhd])$/);
+		const sinceMs = m ? Date.now() - Number(m[1]) * { m: 60_000, h: 3_600_000, d: 86_400_000 }[m[2] as 'm' | 'h' | 'd'] : Number(since) || undefined;
+		return listEvents({ level: qs.get('level') ?? undefined, kind: qs.get('kind') ?? undefined, since: sinceMs, limit: Number(qs.get('limit')) || 100 });
+	} },
+	{ method: 'GET', path: 'logs/summary', scope: 'logs:read', run: () => summary() },
 
 	// ---- site (site admins only: these scopes can't be put on a game-limited key)
 	{ method: 'GET', path: 'settings', scope: 'site:read', run: () => settings() },
@@ -397,6 +409,7 @@ async function handle(event: RequestEvent) {
 		if (e instanceof ApiError) return json({ error: e.message }, { status: e.status });
 		if (isHttpError(e)) return json({ error: e.body.message }, { status: e.status });
 		console.error('[api]', e);
+		await logEvent('error', 'api_error', e instanceof Error ? `${e.name}: ${e.message}` : String(e), { request: event.request, status: 500, detail: e instanceof Error ? e.stack : undefined });
 		return json({ error: 'Something went wrong.' }, { status: 500 });
 	}
 }

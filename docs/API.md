@@ -27,6 +27,7 @@ A key acts as the person who made it and can never do more than they can:
 | `players:write` | site admin, host | invite players by email (counts toward the daily invite limit), remove players (never hosts) |
 | `site:read` | site admin, site-wide keys only | list all games and people; read settings |
 | `site:write` | site admin, site-wide keys only | create games, add people (with invite), change settings |
+| `logs:read` | site admin, site-wide keys only | the error log (below) |
 
 Deleting a category also deletes its photos, so it needs `games:write` **and** `photos:moderate`.
 
@@ -58,5 +59,17 @@ PATCH|DELETE     /api/v1/games/:code/photos/:id       (PATCH: status ok|disquali
 GET|POST         /api/v1/games/:code/players {email, name?}
 PATCH|DELETE     /api/v1/games/:code/players/:userId  (PATCH: team_id)
 GET|PUT          /api/v1/settings                     (site:read / site:write: signups, maxGames, maxPhotos, mailFrom)
+GET              /api/v1/logs?level=&kind=&since=&limit=   (logs:read; since = 30m, 6h, 2d or a ms timestamp)
+GET              /api/v1/logs/summary                       (counts per kind over the last day)
 GET|POST         /api/v1/people {name, email, game?}  (site:read / site:write)
 ```
+
+## The error log
+
+The app keeps its own small log (30 days, at most 5000 rows) of things you'd otherwise dig out of the Cloudflare
+dashboard: `server_error` (unexpected server errors with stack), `api_error`, `mail_failed` (Resend refused an email,
+status and reason), `turnstile_failed` (bot check failed on a sign-up form; `tokenEmpty: true` means the form was sent
+before the check finished), and `client_error` (JavaScript errors reported by people's browsers, with their
+user-agent, so phone-only problems show up). No email addresses, sign-in codes or email bodies are stored.
+Expected 4xx responses (wrong code, 404) aren't logged. The Worker's own console log (Cloudflare → Logs) remains the
+place for anything that never reached the app, such as an outage.

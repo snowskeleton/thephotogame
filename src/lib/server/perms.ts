@@ -21,7 +21,8 @@ export const GAME_SCOPES = {
 } as const;
 export const SITE_SCOPES = {
 	'site:read': { label: 'Read the whole site (site admin only)', help: 'List every game and person, and the site settings.' },
-	'site:write': { label: 'Run the whole site (site admin only)', help: 'Create games, add people, change site settings.' }
+	'site:write': { label: 'Run the whole site (site admin only)', help: 'Create games, add people, change site settings.' },
+	'logs:read': { label: 'Read error logs (site admin only)', help: 'Server errors, failed sign-up checks, email failures and browser errors. No emails or codes are logged.' }
 } as const;
 export const SCOPES = { ...GAME_SCOPES, ...SITE_SCOPES };
 export type Scope = keyof typeof SCOPES;
