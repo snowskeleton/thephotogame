@@ -35,7 +35,7 @@
 		<form method="POST" action="?/add" class="stack" style="margin-top:12px">
 			<label>Name <input name="name" defaultValue={start.name} required maxlength="40" autocomplete="off" /></label>
 			<label>Email <input name="email" type="email" defaultValue={start.email} required autocomplete="off" /></label>
-			<label class="check"><input type="checkbox" name="is_admin" /> Admin (can run every game and manage people)</label>
+			{#if data.iAmOwner}<label class="check"><input type="checkbox" name="is_admin" /> Admin (can run every game and manage people)</label>{/if}
 			{#if data.games.length}
 				<label>
 					Put them in a game

@@ -15,6 +15,14 @@
 		<span aria-hidden="true">›</span>
 	</a>
 
+	<a class="card spread" href="/admin/keys" style="text-decoration:none">
+		<span>
+			<strong>API keys</strong><br />
+			<span class="muted small">Let a script or assistant act as you, with limited permissions.</span>
+		</span>
+		<span aria-hidden="true">›</span>
+	</a>
+
 	<h2 style="margin-top:22px">Games</h2>
 	{#each data.games as g}
 		<a class="card spread" href="/g/{g.code}/admin" style="text-decoration:none">

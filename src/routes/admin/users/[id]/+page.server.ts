@@ -3,14 +3,20 @@ import QRCode from 'qrcode';
 import { cleanEmail, makeHandoff, sendInvite } from '#lib/server/auth.ts';
 import { all, get, now, run } from '#lib/server/db.ts';
 import { requireAdmin, str } from '#lib/server/game.ts';
+import { canManage, isOwner } from '#lib/server/perms.ts';
 import { remove } from '#lib/server/images.ts';
 import { mailReady } from '#lib/server/mail.ts';
 
-type Person = { id: number; name: string; email: string; is_admin: number; created_at: number; last_seen_at: number | null };
+type Person = { id: number; name: string; email: string; is_admin: number; is_owner: number; created_at: number; last_seen_at: number | null };
 const person = (id: string) => {
-	const u = get<Person>('SELECT id, name, email, is_admin, created_at, last_seen_at FROM user WHERE id = ?', Number(id) || 0);
+	const u = get<Person>('SELECT id, name, email, is_admin, is_owner, created_at, last_seen_at FROM user WHERE id = ?', Number(id) || 0);
 	if (!u) error(404, 'No such person');
 	return u;
+};
+
+/** Admins manage players; changing an admin or the owner takes an owner. */
+const manage = (me: App.Locals['user'] & {}, u: Person) => {
+	if (!canManage(me, u)) error(403, 'Only an owner can change an admin or the owner.');
 };
 
 export const load = ({ locals, params, url }) => {
@@ -24,6 +30,8 @@ export const load = ({ locals, params, url }) => {
 	return {
 		u,
 		isMe: u.id === me.id,
+		iAmOwner: isOwner(me),
+		canManage: canManage(me, u),
 		mailReady,
 		added: url.searchParams.has('added'),
 		invited: url.searchParams.get('invited'),
@@ -46,27 +54,30 @@ export const actions = {
 	save: async ({ request, locals, params }) => {
 		const me = requireAdmin(locals);
 		const u = person(params.id);
+		manage(me, u);
 		const f = await request.formData();
 		const name = str(f.get('name'), 40);
 		const email = cleanEmail(f.get('email'));
 		if (!name || !email) return fail(400, { error: 'A person needs a name and a valid email.' });
 		const other = get<{ name: string }>('SELECT name FROM user WHERE email = ? AND id != ?', email, u.id);
 		if (other) return fail(400, { error: `${other.name} already has that email.` });
-		// You can't remove your own admin rights, so there's always at least one admin.
-		const isAdmin = u.id === me.id ? 1 : f.get('is_admin') ? 1 : 0;
+		// Only an owner can make or remove admins. Nobody changes their own rights, and the owner stays an admin.
+		const isAdmin = u.is_owner || u.id === me.id || !isOwner(me) ? u.is_admin : f.get('is_admin') ? 1 : 0;
 		run('UPDATE user SET name = ?, email = ?, is_admin = ? WHERE id = ?', name, email, isAdmin, u.id);
 		return { saved: true };
 	},
 	addToGame: async ({ request, locals, params }) => {
-		requireAdmin(locals);
+		const me = requireAdmin(locals);
 		const u = person(params.id);
+		manage(me, u);
 		const game = Number((await request.formData()).get('game'));
 		if (!get('SELECT 1 FROM game WHERE id = ?', game)) return fail(400, { error: 'Pick a game.' });
 		run('INSERT OR IGNORE INTO member (game_id, user_id) VALUES (?, ?)', game, u.id);
 	},
 	setTeam: async ({ request, locals, params }) => {
-		requireAdmin(locals);
+		const me = requireAdmin(locals);
 		const u = person(params.id);
+		manage(me, u);
 		const f = await request.formData();
 		const game = Number(f.get('game'));
 		const team = Number(f.get('team')) || null;
@@ -74,19 +85,22 @@ export const actions = {
 		run('UPDATE member SET team_id = ? WHERE game_id = ? AND user_id = ?', team, game, u.id);
 	},
 	leaveGame: async ({ request, locals, params }) => {
-		requireAdmin(locals);
+		const me = requireAdmin(locals);
 		const u = person(params.id);
+		manage(me, u);
 		run('DELETE FROM member WHERE game_id = ? AND user_id = ?', Number((await request.formData()).get('game')), u.id);
 	},
 	link: async ({ locals, params, url }) => {
-		requireAdmin(locals);
+		const me = requireAdmin(locals);
 		const u = person(params.id);
+		manage(me, u);
 		const link = `${url.origin}/link/${makeHandoff(u.id, 60 * 24)}`;
 		return { link, qr: await QRCode.toDataURL(link, { margin: 2, width: 320 }) };
 	},
 	email: async ({ locals, params, url }) => {
 		const me = requireAdmin(locals);
 		const u = person(params.id);
+		manage(me, u);
 		try {
 			await sendInvite(u, url.origin, me.name);
 		} catch {
@@ -106,6 +120,8 @@ export const actions = {
 	delete: async ({ locals, params }) => {
 		const me = requireAdmin(locals);
 		const u = person(params.id);
+		manage(me, u);
+		if (u.is_owner) return fail(400, { error: 'The owner can’t be deleted.' });
 		if (u.id === me.id) return fail(400, { error: 'You can’t delete yourself.' });
 		const ids = all<{ id: number }>('SELECT id FROM photo WHERE user_id = ?', u.id);
 		run('DELETE FROM user WHERE id = ?', u.id);

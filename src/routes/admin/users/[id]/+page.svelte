@@ -12,7 +12,7 @@
 
 <main>
 	<p class="small"><a href="/admin/users">‹ People</a></p>
-	<h1>{u.name} {#if u.is_admin}<span class="pill">admin</span>{/if}</h1>
+	<h1>{u.name} {#if u.is_owner}<span class="pill">owner</span>{:else if u.is_admin}<span class="pill">admin</span>{/if}</h1>
 	<p class="muted small">
 		Added {date(u.created_at)} ·
 		{u.last_seen_at ? `last active ${date(u.last_seen_at)}` : 'hasn’t signed in yet'} ·
@@ -28,15 +28,17 @@
 		</p>
 	{/if}
 	{#if form?.error}<p class="err">{form.error}</p>{/if}
+	{#if !data.canManage}<p class="err">{u.name} is {u.is_owner ? 'the owner' : 'an admin'}, so only an owner can change them. Changes here will be refused.</p>{/if}
 
 	<form method="POST" action="?/save" class="card stack" use:enhance>
 		<label>Name <input name="name" defaultValue={u.name} required maxlength="40" /></label>
 		<label>Email <input name="email" type="email" defaultValue={u.email} required /></label>
 		<label class="check">
-			<input type="checkbox" name="is_admin" checked={!!u.is_admin} disabled={data.isMe} />
+			<input type="checkbox" name="is_admin" checked={!!u.is_admin} disabled={data.isMe || !data.iAmOwner || !!u.is_owner} />
 			Admin (can run every game and manage people)
 		</label>
-		{#if data.isMe}<p class="muted small" style="margin:0">This is you. Another admin has to change your admin rights.</p>{/if}
+		{#if data.isMe}<p class="muted small" style="margin:0">This is you. Another admin has to change your admin rights.</p>
+		{:else if !data.iAmOwner}<p class="muted small" style="margin:0">Only an owner can make or remove admins.</p>{/if}
 		{#if form?.saved}<p class="ok">Saved.</p>{/if}
 		<button class="primary">Save</button>
 	</form>

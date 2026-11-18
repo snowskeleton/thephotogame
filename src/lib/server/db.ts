@@ -163,6 +163,36 @@ const hasColumn = (table: string, col: string) =>
 	(db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).some((c) => c.name === col);
 if (!hasColumn('user', 'last_seen_at')) db.exec('ALTER TABLE user ADD COLUMN last_seen_at INTEGER');
 
+// Roles: player < admin (is_admin) < owner (is_owner). Owners are admins too.
+if (!hasColumn('user', 'is_owner')) {
+	db.exec('ALTER TABLE user ADD COLUMN is_owner INTEGER NOT NULL DEFAULT 0');
+	// Existing sites: the ADMIN_EMAIL account is the owner, else the earliest admin.
+	const adminEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+	const byEmail = adminEmail
+		? (db.prepare('SELECT id FROM user WHERE email = ?').get(adminEmail) as { id: number } | undefined)
+		: undefined;
+	const first = byEmail ?? (db.prepare('SELECT id FROM user WHERE is_admin = 1 ORDER BY id LIMIT 1').get() as { id: number } | undefined);
+	if (first) db.prepare('UPDATE user SET is_owner = 1, is_admin = 1 WHERE id = ?').run(first.id);
+}
+
+// API keys: minted by an owner or admin for automation. Only a hash of the token is stored.
+db.exec(`
+CREATE TABLE IF NOT EXISTS api_key (
+	id INTEGER PRIMARY KEY,
+	user_id INTEGER NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+	name TEXT NOT NULL,
+	token_hash TEXT NOT NULL UNIQUE,
+	hint TEXT NOT NULL,
+	scopes TEXT NOT NULL,
+	game_id INTEGER REFERENCES game(id) ON DELETE CASCADE,
+	expires_at INTEGER,
+	last_used_at INTEGER,
+	revoked_at INTEGER,
+	created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS api_key_user ON api_key(user_id);
+`);
+
 // Unsorted photos: photo.category_id used to be NOT NULL. SQLite can't relax that in place, so rebuild
 // the table (the documented create-copy-drop-rename procedure, with foreign keys off).
 const photoCat = (db.prepare('PRAGMA table_info(photo)').all() as { name: string; notnull: number }[]).find(

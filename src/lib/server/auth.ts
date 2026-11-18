@@ -7,17 +7,17 @@ const SESSION_DAYS = 180;
 export const COOKIE = 'pg_session';
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 
-export type User = { id: number; email: string; name: string; is_admin: number };
+export type User = { id: number; email: string; name: string; is_admin: number; is_owner: number };
 
 export function userFromToken(token: string | undefined): User | null {
 	if (!token) return null;
 	const row = get<User & { expires_at: number }>(
-		`SELECT u.id, u.email, u.name, u.is_admin, s.expires_at
+		`SELECT u.id, u.email, u.name, u.is_admin, u.is_owner, s.expires_at
 		 FROM session s JOIN user u ON u.id = s.user_id WHERE s.token = ?`,
 		sha(token)
 	);
 	if (!row || row.expires_at < now()) return null;
-	return { id: row.id, email: row.email, name: row.name, is_admin: row.is_admin };
+	return { id: row.id, email: row.email, name: row.name, is_admin: row.is_admin, is_owner: row.is_owner };
 }
 
 export function startSession(cookies: Cookies, userId: number) {
@@ -44,17 +44,19 @@ export function cleanEmail(v: unknown): string | null {
 }
 
 export function findUserByEmail(email: string) {
-	return get<User>('SELECT id, email, name, is_admin FROM user WHERE email = ?', email);
+	return get<User>('SELECT id, email, name, is_admin, is_owner FROM user WHERE email = ?', email);
 }
 
 export function createUser(email: string, name: string): number {
 	const adminEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
 	const first = !get('SELECT 1 FROM user LIMIT 1');
 	const isAdmin = adminEmail ? email === adminEmail : first;
+	// Whoever bootstraps the site (ADMIN_EMAIL, or the very first account) is its owner.
 	return insert(
-		'INSERT INTO user (email, name, is_admin, created_at) VALUES (?, ?, ?, ?)',
+		'INSERT INTO user (email, name, is_admin, is_owner, created_at) VALUES (?, ?, ?, ?, ?)',
 		email,
 		name,
+		isAdmin ? 1 : 0,
 		isAdmin ? 1 : 0,
 		now()
 	);

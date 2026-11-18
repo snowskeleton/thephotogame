@@ -3,11 +3,13 @@ import { cleanEmail, createUser, findUserByEmail, sendInvite } from '#lib/server
 import { all, get, run } from '#lib/server/db.ts';
 import { requireAdmin, str } from '#lib/server/game.ts';
 import { mailReady } from '#lib/server/mail.ts';
+import { isOwner } from '#lib/server/perms.ts';
 
 export const load = ({ locals }) => {
 	const me = requireAdmin(locals);
 	return {
 		me: me.id,
+		iAmOwner: isOwner(me),
 		mailReady,
 		games: all<{ id: number; name: string }>('SELECT id, name FROM game ORDER BY created_at DESC'),
 		users: all<{
@@ -53,7 +55,7 @@ export const actions = {
 		if (existing) return fail(400, { error: `${existing.name} already has that email.`, existing: existing.id, ...back });
 		const game = gameById(f.get('game'));
 		const id = createUser(email, name);
-		if (f.get('is_admin')) run('UPDATE user SET is_admin = 1 WHERE id = ?', id);
+		if (f.get('is_admin') && isOwner(me)) run('UPDATE user SET is_admin = 1 WHERE id = ?', id);
 		if (game) run('INSERT OR IGNORE INTO member (game_id, user_id) VALUES (?, ?)', game.id, id);
 		let sent = '';
 		if (f.get('invite')) {

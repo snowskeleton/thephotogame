@@ -44,3 +44,8 @@ npm run dev
 ```
 
 Needs Node 24+. Without `SMTP_HOST`, sign-in codes are printed to the console.
+
+## API keys
+
+Owners and admins can mint scoped API keys under **Admin → API keys**; see [docs/API.md](docs/API.md).
+The `ADMIN_EMAIL` account is the site owner; only an owner can make or remove admins.
