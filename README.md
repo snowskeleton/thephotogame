@@ -117,3 +117,8 @@ In the Cloudflare dashboard (with `yourdomain.com` as your domain):
 Then check: opening `https://photos.yourdomain.com/photos/1/thumb.jpg` in a
 browser should be blocked, while photos in the app still load. Leave
 `PHOTOS_URL` empty to go back to reading the bucket directly.
+
+## API keys
+
+Site admins and game hosts can make scoped API keys under **Account → API keys**; see [docs/API.md](docs/API.md).
+The migration `0004_api_keys.sql` applies itself on the first request after deploy.

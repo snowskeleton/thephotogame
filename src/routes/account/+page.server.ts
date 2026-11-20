@@ -1,12 +1,15 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { qrDataUrl } from '#lib/server/qr.ts';
 import { makeHandoff } from '#lib/server/auth.ts';
-import { all, run } from '#lib/server/db.ts';
+import { all, get, run } from '#lib/server/db.ts';
 import { str } from '#lib/server/game.ts';
 
 export const load = async ({ locals }) => {
 	if (!locals.user) redirect(303, '/login?next=/account');
 	return {
+		canKeys:
+			!!locals.user.is_admin ||
+			!!(await get("SELECT 1 FROM member WHERE user_id = ? AND role = 'host' AND status = 'active' LIMIT 1", locals.user.id)),
 		passkeys: await all<{ id: string; created_at: number }>(
 			'SELECT id, created_at FROM passkey WHERE user_id = ? ORDER BY created_at',
 			locals.user.id

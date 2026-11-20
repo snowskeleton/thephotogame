@@ -1,5 +1,6 @@
 import { config } from './db.ts';
 import { settings } from './settings.ts';
+import { logEvent } from './log.ts';
 
 // Workers can't speak SMTP through nodemailer, so mail goes out over Resend's HTTP API.
 // Without RESEND_API_KEY, messages are printed to the Worker's log instead (fine for development,
@@ -30,6 +31,7 @@ export async function sendMail(to: string, subject: string, text: string) {
 		// Log the message too, so a site admin can still pass on a code or link from the Worker's logs.
 		const why = `Mail failed: ${res.status} ${await res.text()}`;
 		console.error(`[mail failed] to=${to} subject=${subject}\n${why}\n${text}`);
+		await logEvent('error', 'mail_failed', `Resend refused an email (${res.status})`, { status: res.status, detail: why.replace(/\s+/g, ' ').slice(0, 400) });
 		throw new Error(why);
 	}
 }
