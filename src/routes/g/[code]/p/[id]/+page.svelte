@@ -91,15 +91,14 @@
 		</form>
 		{#if data.otherTeams.length}
 			<form method="POST" action="?/give" class="stack" use:enhance={() => async ({ update, formElement }) => { await update(); formElement.reset(); }}>
-				<strong>Give another team points for this photo</strong>
-				<div class="row" style="flex-wrap:nowrap">
-					<label class="grow">Team
-						<select name="team" required>
-							{#each data.otherTeams as t}<option value={t.id}>{t.name}</option>{/each}
-						</select>
-					</label>
-					<label style="width:90px">Points <input name="points" inputmode="decimal" value="1" /></label>
-				</div>
+				<strong>Give other teams points for this photo</strong>
+				<fieldset class="stack" style="border:0;padding:0;margin:0;gap:4px">
+					<legend class="small muted" style="padding:0">Teams (pick any number)</legend>
+					{#each data.otherTeams as t}
+						<label class="check"><input type="checkbox" name="team" value={t.id} /> <span class="grow">{t.name}</span></label>
+					{/each}
+				</fieldset>
+				<label>Points each <input name="points" inputmode="decimal" value="1" /></label>
 				<label>Reason <input name="title" required maxlength="80" value="Also in the photo" /></label>
 				{#if form?.giveError}<p class="err small" style="margin:0">{form.giveError}</p>{/if}
 				{#if form?.gave}<p class="ok small" style="margin:0">Points given.</p>{/if}
