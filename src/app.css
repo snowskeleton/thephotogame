@@ -148,6 +148,8 @@ button:disabled { opacity: 0.5; cursor: default; }
 	background: rgba(0, 0, 0, 0.66); color: #fff;
 	font-size: 0.72rem; font-weight: 700; padding: 1px 7px; border-radius: 999px;
 }
+.ph .tag.unscored { background: #b45309; }
+.ph .tag.scored { background: rgba(22, 101, 52, 0.85); }
 .ph.off img { filter: grayscale(1); opacity: 0.5; }
 table { width: 100%; border-collapse: collapse; }
 td, th { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }

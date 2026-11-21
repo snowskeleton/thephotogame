@@ -13,7 +13,7 @@
 	{data.game.team_mode === 'self' ? 'Players pick their own team.' : 'You assign teams.'}
 	{max ? `Max team size: ${max}.` : 'No size limit.'} Change this under Game.
 </p>
-{#if form?.error}<p class="err">{form.error}</p>{/if}
+{#if form?.error && form.pointsTeam == null}<p class="err">{form.error}</p>{/if}
 
 {#if form?.invited}
 	<p class="ok">
@@ -34,6 +34,17 @@
 			<label>Name <input name="name" defaultValue={t.name} required maxlength="40" /></label>
 			<ColorPicker value={t.color} taken={data.teams.map((x) => x.color)} />
 			<button>Save team</button>
+		</form>
+		<form method="POST" action="?/givePoints" class="stack" style="margin-top:12px" use:enhance={() => async ({ update, formElement }) => { await update(); formElement.reset(); }}>
+			<input type="hidden" name="team" value={t.id} />
+			<strong>Give {t.name} points</strong>
+			<div class="row" style="flex-wrap:nowrap">
+				<label class="grow">Reason <input name="title" required maxlength="80" placeholder="Also in Levi’s photo" /></label>
+				<label style="width:90px">Points <input name="points" inputmode="decimal" value="1" /></label>
+			</div>
+			{#if form?.pointsTeam === t.id && form?.error}<p class="err small" style="margin:0">{form.error}</p>{/if}
+			{#if form?.given === t.id}<p class="ok small" style="margin:0">Points given. See them under Awards.</p>{/if}
+			<button>Give points</button>
 		</form>
 		<form method="POST" action="?/deleteTeam" style="margin-top:8px" onsubmit={confirmDel('Delete this team?')}>
 			<input type="hidden" name="id" value={t.id} />

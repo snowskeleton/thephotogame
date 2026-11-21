@@ -4,6 +4,7 @@ import { mailReady } from '#lib/server/mail.ts';
 import { all, get, insert, run } from '#lib/server/db.ts';
 import { validColor } from '#lib/colors.ts';
 import { gameByCode, requireHost, str } from '#lib/server/game.ts';
+import { giveTeamPoints } from '#lib/server/grants.ts';
 
 export const load = async ({ params, locals }) => {
 	const game = await gameByCode(params.code);
@@ -29,6 +30,13 @@ export const load = async ({ params, locals }) => {
 const color = validColor;
 
 export const actions = {
+	givePoints: async ({ request, params, locals }) => {
+		const game = await requireHost(locals, params.code);
+		const f = await request.formData();
+		const err = await giveTeamPoints(game, f);
+		if (err) return fail(400, { error: err, pointsTeam: Number(f.get('team')) });
+		return { given: Number(f.get('team')) };
+	},
 	addTeam: async ({ request, params, locals }) => {
 		const game = await requireHost(locals, params.code);
 		const f = await request.formData();

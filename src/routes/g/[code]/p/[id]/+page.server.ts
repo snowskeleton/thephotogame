@@ -3,6 +3,7 @@ import { all, get, run } from '#lib/server/db.ts';
 import { canSee, enter, num, str } from '#lib/server/game.ts';
 import { optionsFor, saveClaims } from '#lib/server/claims.ts';
 import { remove } from '#lib/server/images.ts';
+import { giveTeamPoints } from '#lib/server/grants.ts';
 import { onePhoto } from '#lib/server/photos.ts';
 import { scoreGame } from '#lib/server/scoring.ts';
 import { categoryIn, fileInto } from '#lib/server/uploads.ts';
@@ -55,6 +56,9 @@ export const load = async (event) => {
 			viewer.isHost ? 1 : 0,
 			photo.category_id
 		),
+		otherTeams: viewer.isHost
+			? await all<{ id: number; name: string }>('SELECT id, name FROM team WHERE game_id = ? AND id != ? ORDER BY id', game.id, photo.team_id)
+			: [],
 		isNew: event.url.searchParams.has('new')
 	};
 };
@@ -118,6 +122,13 @@ export const actions = {
 		// Clearing doubts means an approved photo doesn't bounce straight back into review.
 		await run('DELETE FROM doubt WHERE photo_id = ?', photo.id);
 		await run('DELETE FROM review_vote WHERE photo_id = ?', photo.id);
+	},
+	give: async (event) => {
+		const { game, viewer, photo } = await ctx(event);
+		if (!viewer.isHost) return fail(403, { error: 'Admins only' });
+		const err = await giveTeamPoints(game, await event.request.formData(), [photo.id]);
+		if (err) return fail(400, { giveError: err });
+		return { gave: true };
 	},
 	adjust: async (event) => {
 		const { viewer, photo } = await ctx(event);

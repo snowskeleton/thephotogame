@@ -89,6 +89,23 @@
 				<input name="points" inputmode="decimal" defaultValue={data.override ?? ''} placeholder={pts(data.score.claimed)} /></label>
 			<button>Save</button>
 		</form>
+		{#if data.otherTeams.length}
+			<form method="POST" action="?/give" class="stack" use:enhance={() => async ({ update, formElement }) => { await update(); formElement.reset(); }}>
+				<strong>Give another team points for this photo</strong>
+				<div class="row" style="flex-wrap:nowrap">
+					<label class="grow">Team
+						<select name="team" required>
+							{#each data.otherTeams as t}<option value={t.id}>{t.name}</option>{/each}
+						</select>
+					</label>
+					<label style="width:90px">Points <input name="points" inputmode="decimal" value="1" /></label>
+				</div>
+				<label>Reason <input name="title" required maxlength="80" value="Also in the photo" /></label>
+				{#if form?.giveError}<p class="err small" style="margin:0">{form.giveError}</p>{/if}
+				{#if form?.gave}<p class="ok small" style="margin:0">Points given.</p>{/if}
+				<button>Give points</button>
+			</form>
+		{/if}
 		<a class="btn" href="{base}/admin/awards?photo={p.id}#pencil">🏅 Pencil in an award for this photo</a>
 	</div>
 {/if}

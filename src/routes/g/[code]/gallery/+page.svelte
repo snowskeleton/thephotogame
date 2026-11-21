@@ -26,6 +26,9 @@
 		<option value="">All days</option>
 		{#each data.days as d}<option value={d} selected={data.filter.day === d}>{dayName(d)}</option>{/each}
 	</select>
+	{#if data.isHost}
+		<label class="check small" style="white-space:nowrap"><input type="checkbox" name="unscored" value="1" checked={data.filter.unscored} onchange={() => formEl.requestSubmit()} /> Unscored only</label>
+	{/if}
 </form>
 
 {#if data.hiddenCount > 0}
@@ -34,7 +37,7 @@
 
 {#if data.photos.length}
 	<div class="photos">
-		{#each data.photos as p}<Thumb photo={p} code={data.game.code} />{/each}
+		{#each data.photos as p}<Thumb photo={p} code={data.game.code} showScore={data.isHost} />{/each}
 	</div>
 {:else}
 	<p class="muted">No photos here yet.</p>

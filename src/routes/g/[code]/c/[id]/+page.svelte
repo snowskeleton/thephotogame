@@ -56,7 +56,7 @@
 		{#each data.ours as p (p.id)}
 			<div class="card ourrow" style="{tv(p.color)}">
 				<div class="row" style="flex-wrap:nowrap">
-					<div class="ourthumb"><Thumb photo={p} code={data.game.code} /></div>
+					<div class="ourthumb"><Thumb photo={p} code={data.game.code} showScore={data.isHost} /></div>
 					<div class="grow">
 						<strong>{p.who}</strong>
 						{#if p.caption}<div class="small">{p.caption}</div>{/if}
@@ -84,7 +84,7 @@
 {#if data.theirs.length}
 	<h2>Other teams</h2>
 	<div class="photos">
-		{#each data.theirs as p}<Thumb photo={p} code={data.game.code} />{/each}
+		{#each data.theirs as p}<Thumb photo={p} code={data.game.code} showScore={data.isHost} />{/each}
 	</div>
 {/if}
 
