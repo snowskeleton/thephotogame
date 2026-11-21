@@ -81,7 +81,9 @@
 				<a href="/media/{u.id}/large" target="_blank" rel="noopener" class="sortthumb">
 					<img src="/media/{u.id}/thumb" alt={u.caption || 'Unsorted photo'} loading="lazy" />
 				</a>
-				<form method="POST" action="?/file" class="grow stack" style="gap:6px" use:enhance>
+				<!-- reset:false keeps what was typed: the default reset would blank the caption the moment a caption-only save returns. -->
+				<form method="POST" action="?/file" class="grow stack" style="gap:6px"
+					use:enhance={() => async ({ update }) => { await update({ reset: false }); }}>
 					<input type="hidden" name="photo_id" value={u.id} />
 					<input name="caption" maxlength="200" placeholder="Caption (optional)" aria-label="Caption" defaultValue={u.caption}
 						onchange={(e) => e.currentTarget.form?.requestSubmit()} />
@@ -92,8 +94,7 @@
 					</select>
 					<noscript><button class="sm">File it</button></noscript>
 				</form>
-				<form method="POST" action="?/discard" use:enhance
-					onsubmit={(e) => { if (!confirm('Delete this photo?')) e.preventDefault(); }}>
+				<form method="POST" action="?/discard" use:enhance={({ cancel }) => { if (!confirm('Delete this photo?')) cancel(); }}>
 					<input type="hidden" name="photo_id" value={u.id} />
 					<button class="sm danger" aria-label="Delete photo">✕</button>
 				</form>

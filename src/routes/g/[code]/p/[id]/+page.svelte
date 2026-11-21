@@ -64,7 +64,7 @@
 				<span class="row" style="gap:8px;flex-wrap:nowrap">
 					{g.points >= 0 ? '+' : ''}{pts(g.points)}
 					{#if data.isHost}
-						<form method="POST" action="?/removeCredit" use:enhance onsubmit={(e) => { if (!confirm(`Remove ${g.team}'s points from this photo?`)) e.preventDefault(); }}>
+						<form method="POST" action="?/removeCredit" use:enhance={({ cancel }) => { if (!confirm(`Remove ${g.team}'s points from this photo?`)) cancel(); }}>
 							<input type="hidden" name="id" value={g.id} />
 							<button class="sm danger" aria-label="Remove these points">✕</button>
 						</form>
