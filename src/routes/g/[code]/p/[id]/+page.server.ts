@@ -93,11 +93,12 @@ export const actions = {
 				if (photo.status !== 'ok') return fail(400, { error: 'A photo under review or disqualified can’t be moved.' });
 			}
 			await run('UPDATE photo SET caption = ? WHERE id = ?', str(f.get('caption'), 200), photo.id);
-			// The claim belonged to the old category's options, so it starts over.
+			// The claim belonged to the old category's options, so it's cleared for the host to redo.
 			await fileInto(photo.id, target.id, false);
 			return { saved: true, moved: target.name };
 		}
-		await saveClaims(photo.id, photo.category_id, f);
+		// Players keep their caption; points are assigned by the host only.
+		if (viewer.isHost) await saveClaims(photo.id, photo.category_id, f);
 		await run('UPDATE photo SET caption = ? WHERE id = ?', str(f.get('caption'), 200), photo.id);
 		return { saved: true };
 	},

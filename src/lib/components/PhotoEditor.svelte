@@ -9,13 +9,16 @@
 		code,
 		options,
 		claims,
-		categories
+		categories,
+		canScore = false
 	}: {
 		photo: { id: number; category_id: number; caption: string };
 		code: string;
 		options: Option[];
 		claims: { option_id: number; qty: number }[];
 		categories: { id: number; name: string }[];
+		/** Only the host assigns points. */
+		canScore?: boolean;
 	} = $props();
 
 	// The editor posts to the photo page's actions, so it works the same wherever it's shown.
@@ -51,8 +54,8 @@
 		</label>
 	{/if}
 	{#if moving}
-		<p class="muted small" style="margin:0">Moving starts the claim over with the new category's first option. You can change it after.</p>
-	{:else}
+		<p class="muted small" style="margin:0">Moving clears the photo's points. The host sets them again.</p>
+	{:else if canScore}
 		<ClaimFields {options} {claims} />
 	{/if}
 	<label>Caption <input name="caption" maxlength="200" defaultValue={photo.caption} /></label>

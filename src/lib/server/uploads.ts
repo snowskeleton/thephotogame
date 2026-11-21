@@ -1,7 +1,7 @@
 import { fail } from '@sveltejs/kit';
 import { all, batch, get, insert, now, q, run } from './db.ts';
 import { str, type Game, type Viewer } from './game.ts';
-import { claimStatements, optionsFor } from './claims.ts';
+import { claimStatements } from './claims.ts';
 import { remove, sniff, store } from './images.ts';
 import { settings } from './settings.ts';
 
@@ -53,7 +53,8 @@ export async function savePhotos(game: Game, viewer: Viewer, f: FormData, catego
 		await remove([{ id, ext }]);
 		return fail(400, { added: 0, error: `“${original.name}” couldn’t be saved. Try it again.` });
 	}
-	if (category) await batch(await claimStatements(id, category.id, f));
+	// Points are the host's call; a player's own claim is never stored.
+	if (category && viewer.isHost) await batch(await claimStatements(id, category.id, f));
 	return { added: 1 };
 }
 
@@ -69,15 +70,13 @@ async function full(gameId: number) {
 	return !g.admin && g.n >= maxPhotos;
 }
 
-/** Moves a photo into a category with that category's default claim (its first tier). */
+/** Moves a photo into a category. Claims belong to the old category's options, so they are cleared and the host scores it again. */
 export async function fileInto(photoId: number, categoryId: number, wasUnsorted: boolean) {
-	const tier = (await optionsFor(categoryId)).find((o) => o.kind === 'tier');
 	await batch([
 		q('UPDATE photo SET category_id = ? WHERE id = ?', categoryId, photoId),
 		// "Submitted" means filed: in hidden mode a photo filed after a reveal waits for the next one.
 		...(wasUnsorted ? [q('UPDATE photo SET created_at = ? WHERE id = ?', now(), photoId)] : []),
-		q('DELETE FROM photo_claim WHERE photo_id = ?', photoId),
-		...(tier ? [q('INSERT INTO photo_claim (photo_id, option_id, qty) VALUES (?, ?, 1)', photoId, tier.id)] : [])
+		q('DELETE FROM photo_claim WHERE photo_id = ?', photoId)
 	]);
 }
 

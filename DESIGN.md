@@ -17,7 +17,7 @@ looks through the day's photos together at night, votes, and wins prizes.
 | Teams | Per game: the host assigns teams, or players team up themselves. A max team size is shown; admins can exceed it and the team is flagged as oversized |
 | Scoring | Each photo earns points from its category's scoring options, plus voted awards, pencilled-in awards and optional bingo bonuses |
 | Voting | Approval voting: vote for as many photos as you like, most votes wins |
-| Submissions | Any number per category, on the honor system. Optional per-category cap on how many photos score; admins can disqualify |
+| Submissions | Any number per category, points are assigned by hosts only. Optional per-category cap on how many photos score; admins can disqualify |
 | Visibility | Per game: photos hidden until the showrunner reveals them, or always visible |
 | Structure | Categories can carry a day label, so a game can be trip-long, daily, or mixed |
 | Media | Photos only |
@@ -140,8 +140,10 @@ item". So a category has a list of **scoring options**:
 
 Points can be fractional (0.5).
 
-The person uploading claims the tier and extras for their photo (honor
-system). Checks on that:
+Players don't score their own photos. A new photo is **awaiting points** until a
+host picks its tier and extras (or types a total) on the photo page. Photos
+that already had a player's claim keep it, but players can no longer change it.
+Moving a photo to another category clears its points. Checks:
 
 - **Doubt**: players on other teams can doubt a photo. When more than the
   game's doubt limit (default 2) doubt it, the photo goes **under review**:
@@ -185,10 +187,8 @@ no gallery, and only the photographer's team (and admins) can load them.
 Filing one sets its time to "now", so in hidden mode a photo filed after a
 reveal waits for the next reveal.
 
-A category page also uploads (straight into that category, with the claim and
-caption) and stays on the page. Its list of the team's photos has an editor for
-the photographer and admins: claim, caption, move to another category (the
-claim restarts at the first option) and delete. The page sends one photo per
+A category page also uploads (straight into that category, with the caption) and stays on the page. Its list of the team's photos has an editor for
+the photographer and admins: caption, move to another category (which clears its points) and delete; hosts also set the points. The page sends one photo per
 request with a progress bar, so a big batch doesn't fail as a whole.
 
 ## Visibility

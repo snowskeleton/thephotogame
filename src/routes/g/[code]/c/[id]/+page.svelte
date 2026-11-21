@@ -37,7 +37,7 @@
 		<h2 style="margin:0">Add photos here</h2>
 		<Uploader>
 			{#snippet fields()}
-				<ClaimFields options={data.options} />
+				{#if data.isHost}<ClaimFields options={data.options} />{/if}
 				<label>Caption (optional) <input name="caption" maxlength="200" /></label>
 			{/snippet}
 		</Uploader>
@@ -63,6 +63,7 @@
 						<div class="muted small">
 							{#if p.status === 'disqualified'}Disqualified
 							{:else if p.status === 'review'}Under review
+							{:else if p.score.pending}Awaiting points
 							{:else if p.score.counted}{pts(p.score.points)} pt
 							{:else}Over the scoring limit{/if}
 						</div>
@@ -72,7 +73,7 @@
 					<details>
 						<summary>Edit</summary>
 						<div class="stack" style="margin-top:10px">
-							<PhotoEditor photo={p} code={data.game.code} options={data.options} claims={p.claims} categories={data.categories} />
+							<PhotoEditor photo={p} code={data.game.code} options={data.options} claims={p.claims} categories={data.categories} canScore={data.isHost} />
 						</div>
 					</details>
 				{/if}
