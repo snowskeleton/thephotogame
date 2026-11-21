@@ -85,6 +85,7 @@ export const actions = {
 		if (!mine && !viewer.isAdmin) return fail(403, { error: 'Only the photographer can change this.' });
 		const f = await event.request.formData();
 		const cat = Number(f.get('category'));
+		// Players keep their caption and category; points are assigned by the showrunner only.
 		if (cat && cat !== photo.category_id) {
 			const target = categoryIn(game.id, cat);
 			if (!target) return fail(400, { error: 'That category is gone.' });
@@ -93,11 +94,11 @@ export const actions = {
 				if (photo.status !== 'ok') return fail(400, { error: 'A photo under review or disqualified can’t be moved.' });
 			}
 			run('UPDATE photo SET caption = ? WHERE id = ?', str(f.get('caption'), 200), photo.id);
-			// The claim belonged to the old category's options, so it starts over.
+			// The claim belonged to the old category's options, so it's cleared for the showrunner to redo.
 			fileInto(photo.id, target.id, false);
 			return { saved: true, moved: target.name };
 		}
-		saveClaims(photo.id, photo.category_id, f);
+		if (viewer.isAdmin) saveClaims(photo.id, photo.category_id, f);
 		run('UPDATE photo SET caption = ? WHERE id = ?', str(f.get('caption'), 200), photo.id);
 		return { saved: true };
 	},

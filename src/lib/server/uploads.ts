@@ -1,7 +1,7 @@
 import { fail } from '@sveltejs/kit';
 import { all, get, insert, now, run } from './db.ts';
 import { str, type Game, type Viewer } from './game.ts';
-import { optionsFor, saveClaims } from './claims.ts';
+import { saveClaims } from './claims.ts';
 import { inspect, remove, store } from './images.ts';
 
 /** The page sends one photo per request; this cap only matters for a browser without JavaScript. */
@@ -41,20 +41,19 @@ export async function savePhotos(game: Game, viewer: Viewer, f: FormData, catego
 			await remove(id);
 			return fail(400, { added, error: `“${file.name}” couldn’t be processed. If it’s a HEIC file, send it as a JPEG.` });
 		}
-		if (category) saveClaims(id, category.id, f);
+		// Points are the showrunner's call; a player's own claim is never stored.
+		if (category && viewer.isAdmin) saveClaims(id, category.id, f);
 		added++;
 	}
 	return { added };
 }
 
-/** Moves a photo into a category with that category's default claim (its first tier). */
+/** Moves a photo into a category. Claims belong to the old category's options, so they are cleared and the showrunner scores it again. */
 export function fileInto(photoId: number, categoryId: number, wasUnsorted: boolean) {
 	run('UPDATE photo SET category_id = ? WHERE id = ?', categoryId, photoId);
 	// "Submitted" means filed: in hidden mode a photo filed after a reveal waits for the next one.
 	if (wasUnsorted) run('UPDATE photo SET created_at = ? WHERE id = ?', now(), photoId);
 	run('DELETE FROM photo_claim WHERE photo_id = ?', photoId);
-	const tier = optionsFor(categoryId).find((o) => o.kind === 'tier');
-	if (tier) run('INSERT INTO photo_claim (photo_id, option_id, qty) VALUES (?, ?, 1)', photoId, tier.id);
 }
 
 export function unsortedFor(gameId: number, userId: number) {

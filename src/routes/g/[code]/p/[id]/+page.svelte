@@ -35,6 +35,7 @@
 			<strong>
 				{#if p.status === 'disqualified'}Disqualified
 				{:else if p.status === 'review'}Under review — no points for now
+				{:else if data.score.pending}Awaiting points from the showrunner
 				{:else if !data.score.counted}Over this category's scoring limit
 				{:else}Points{/if}
 			</strong>
@@ -71,7 +72,7 @@
 	<details class="card">
 		<summary>Edit photo</summary>
 		<div class="stack" style="margin-top:12px">
-			<PhotoEditor photo={p} code={data.game.code} options={data.options} claims={data.claims} categories={data.categories} />
+			<PhotoEditor photo={p} code={data.game.code} options={data.options} claims={data.claims} categories={data.categories} canScore={data.isAdmin} />
 		</div>
 	</details>
 {/if}
@@ -84,7 +85,7 @@
 			{#if p.status !== 'disqualified'}<button name="to" value="disqualified" class="grow danger">✖ Disqualify</button>{/if}
 		</form>
 		<form method="POST" action="?/adjust" class="stack" use:enhance>
-			<label>Set points yourself (leave empty to use the claim)
+			<label>Set points yourself (leave empty to use the options chosen above)
 				<input name="points" inputmode="decimal" defaultValue={data.override ?? ''} placeholder={pts(data.score.claimed)} /></label>
 			<button>Save</button>
 		</form>

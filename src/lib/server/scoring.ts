@@ -1,7 +1,8 @@
 import { all } from './db.ts';
 import type { Game } from './game.ts';
 
-export type PhotoScore = { claimed: number; points: number; counted: boolean };
+/** `pending` means nobody (admin) has assigned points yet. */
+export type PhotoScore = { claimed: number; points: number; counted: boolean; pending: boolean };
 export type TeamScore = {
 	id: number;
 	name: string;
@@ -65,10 +66,12 @@ export function scoreGame(game: Game) {
 		status: string;
 		points_override: number | null;
 		claimed: number;
+		has_claim: number;
 	}>(
 		`SELECT p.id, p.category_id, p.team_id, p.user_id, p.status, p.points_override,
 			COALESCE((SELECT SUM(o.points * c.qty) FROM photo_claim c
-				JOIN score_option o ON o.id = c.option_id WHERE c.photo_id = p.id), 0) AS claimed
+				JOIN score_option o ON o.id = c.option_id WHERE c.photo_id = p.id), 0) AS claimed,
+			(SELECT COUNT(*) FROM photo_claim c WHERE c.photo_id = p.id) AS has_claim
 		 FROM photo p WHERE p.game_id = ? AND p.category_id IS NOT NULL`,
 		game.id
 	);
@@ -78,7 +81,7 @@ export function scoreGame(game: Game) {
 	const groups = new Map<string, typeof photos>();
 	for (const p of photos) {
 		const claimed = p.points_override ?? p.claimed;
-		photoScores.set(p.id, { claimed, points: 0, counted: false });
+		photoScores.set(p.id, { claimed, points: 0, counted: false, pending: p.points_override == null && !p.has_claim });
 		if (p.status !== 'ok' || !capOf.has(p.category_id)) continue;
 		const k = `${p.team_id}:${p.category_id}`;
 		if (!groups.has(k)) groups.set(k, []);
