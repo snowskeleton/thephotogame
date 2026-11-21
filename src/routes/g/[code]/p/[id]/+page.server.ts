@@ -26,7 +26,7 @@ async function browseNav(event: { url: URL }, game: Awaited<ReturnType<typeof ct
 	let rows = await listPhotos(game, viewer, filter);
 	if (filter.unscored) {
 		const scores = (await scoreGame(game)).photoScores;
-		rows = rows.filter((p) => scores.get(p.id)?.pending || p.id === id);
+		rows = rows.filter((p) => (scores.get(p.id)?.pending && p.status !== 'disqualified') || p.id === id);
 	}
 	const i = rows.findIndex((p) => p.id === id);
 	const link = (p?: { id: number }) => (p ? `/g/${game.code}/p/${p.id}${fromGallery(query)}` : null);

@@ -14,7 +14,7 @@ export const load = async ({ params, locals, url }) => {
 	const people = new Map(everything.map((p) => [p.user_id, p.who]));
 	return {
 		filter,
-		photos: filter.unscored ? photos.filter((p) => p.score?.pending) : photos,
+		photos: filter.unscored ? photos.filter((p) => p.score?.pending && p.status !== 'disqualified') : photos,
 		days: [...new Set(everything.map((p) => p.day))],
 		people: [...people].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)),
 		hiddenCount: viewer.isHost
