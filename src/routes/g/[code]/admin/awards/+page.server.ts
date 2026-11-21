@@ -1,6 +1,7 @@
 import { fail } from '@sveltejs/kit';
 import { all, batch, get, insert, now, q, run } from '#lib/server/db.ts';
 import { gameByCode, num, requireHost, str } from '#lib/server/game.ts';
+import { announce } from '#lib/server/webhooks.ts';
 
 export const load = async ({ params, url }) => {
 	const game = await gameByCode(params.code);
@@ -80,7 +81,7 @@ export const actions = {
 			return fail(400, { grantError: 'That player isn’t in this game.' });
 		const photoIds = f.getAll('photos').map(Number);
 		// One batch so a grant never exists without its photos. The new grant is the highest id in the table.
-		await batch([
+		const done = await batch([
 			q(
 				'INSERT INTO grant_award (game_id, team_id, user_id, title, note, points, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
 				game.id, teamId, userId, title, str(f.get('note'), 400), num(f.get('points')), now()
@@ -92,6 +93,11 @@ export const actions = {
 				JSON.stringify([...new Set(photoIds)]), game.id
 			)
 		]);
+		const grantId = done[0].meta.last_row_id;
+		const attached = await all<{ photo_id: number }>('SELECT photo_id FROM grant_photo WHERE grant_id = ?', grantId);
+		// With photos, the comment goes in each photo's thread. Without, it is a plain message.
+		if (attached.length) for (const a of attached) announce('points.granted', a.photo_id, { grantId });
+		else announce('points.granted', null, { grantId }, game.id);
 		return { granted: true };
 	},
 	deleteGrant: async ({ request, params, locals }) => {

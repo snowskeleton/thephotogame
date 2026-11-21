@@ -9,6 +9,7 @@ import { actorFromToken, type Actor, type Scope } from '#lib/server/perms.ts';
 import { scoreGame } from '#lib/server/scoring.ts';
 import { saveSettings, settings } from '#lib/server/settings.ts';
 import { listEvents, logEvent, summary } from '#lib/server/log.ts';
+import { addWebhook, announce, listWebhooks, publicHook, testWebhook, updateWebhook } from '#lib/server/webhooks.ts';
 
 /**
  * JSON API for API keys (see docs/API.md). Authenticated only by `Authorization: Bearer pgk_...`;
@@ -306,7 +307,7 @@ const routes: Route[] = [
 	} },
 	{ method: 'PATCH', path: 'games/:code/photos/:id', scope: 'photos:moderate', game: true, run: async (c) => {
 		const g = await theGame(c);
-		const p = await findIn<{ id: number }>('SELECT id FROM photo WHERE id = ? AND game_id = ?', c.p[3], g.id, 'photo');
+		const p = await findIn<{ id: number; status: string }>('SELECT id, status FROM photo WHERE id = ? AND game_id = ?', c.p[3], g.id, 'photo');
 		if ('status' in c.body) {
 			if (!['ok', 'disqualified'].includes(String(c.body.status))) throw bad('status must be ok or disqualified');
 			await batch([
@@ -314,10 +315,12 @@ const routes: Route[] = [
 				q('DELETE FROM doubt WHERE photo_id = ?', p.id),
 				q('DELETE FROM review_vote WHERE photo_id = ?', p.id)
 			]);
+			if (String(c.body.status) !== p.status) announce(String(c.body.status) === 'disqualified' ? 'photo.disqualified' : 'photo.restored', p.id);
 		}
 		if ('points_override' in c.body) {
 			const raw = c.body.points_override;
 			await run('UPDATE photo SET points_override = ? WHERE id = ?', raw === null || raw === '' ? null : num(raw), p.id);
+			announce('photo.scored', p.id);
 		}
 		return get('SELECT id, status, points_override FROM photo WHERE id = ?', p.id);
 	} },
@@ -325,6 +328,31 @@ const routes: Route[] = [
 		const p = await findIn<{ id: number; ext: string }>('SELECT id, ext FROM photo WHERE id = ? AND game_id = ?', c.p[3], (await theGame(c)).id, 'photo');
 		await run('DELETE FROM photo WHERE id = ?', p.id);
 		await remove([p]);
+		return { ok: true };
+	} },
+
+	// ---- webhooks (the address holds a secret key, so it is never returned)
+	{ method: 'GET', path: 'games/:code/webhooks', scope: 'games:read', game: true, run: async (c) =>
+		(await listWebhooks((await theGame(c)).id)).map(publicHook) },
+	{ method: 'POST', path: 'games/:code/webhooks', scope: 'games:write', game: true, run: async (c) => {
+		const g = await theGame(c);
+		const r = await addWebhook(g.id, { name: c.body.name, kind: c.body.kind, url: c.body.url, secret: c.body.secret, events: c.body.events, hiddenOk: c.body.hidden_ok, active: c.body.active });
+		if ('error' in r) throw bad(r.error);
+		return publicHook((await listWebhooks(g.id)).find((h) => h.id === r.id)!);
+	} },
+	{ method: 'PATCH', path: 'games/:code/webhooks/:id', scope: 'games:write', game: true, run: async (c) => {
+		const g = await theGame(c);
+		const r = await updateWebhook(g.id, Number(c.p[3]) || 0, { name: c.body.name, url: c.body.url, secret: c.body.secret, events: c.body.events, hiddenOk: c.body.hidden_ok, active: c.body.active });
+		if ('error' in r) throw r.error === 'No such webhook.' ? missing(r.error) : bad(r.error);
+		return publicHook((await listWebhooks(g.id)).find((h) => h.id === Number(c.p[3]))!);
+	} },
+	{ method: 'POST', path: 'games/:code/webhooks/:id/test', scope: 'games:write', game: true, run: async (c) => {
+		const result = await testWebhook((await theGame(c)).id, Number(c.p[3]) || 0);
+		if (result === 'No such webhook.') throw missing(result);
+		return { ok: result === 'Sent.', result };
+	} },
+	{ method: 'DELETE', path: 'games/:code/webhooks/:id', scope: 'games:write', game: true, run: async (c) => {
+		await run('DELETE FROM webhook WHERE id = ? AND game_id = ?', Number(c.p[3]) || 0, (await theGame(c)).id);
 		return { ok: true };
 	} },
 

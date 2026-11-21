@@ -1,5 +1,6 @@
 import { batch, get, now, q } from './db.ts';
 import { num, str, type Game } from './game.ts';
+import { announce } from './webhooks.ts';
 
 /** Gives a team points for a photo (e.g. someone from another team is in it). The points show on the photo's page and stop counting if the photo is disqualified. */
 export async function giveTeamPoints(game: Game, f: FormData, photoIds: number[]) {
@@ -14,7 +15,7 @@ export async function giveTeamPoints(game: Game, f: FormData, photoIds: number[]
 	if (!teamIds.length) return 'Choose at least one team.';
 	// One batch so a grant never exists without its photos. Each grant is the highest id in the table when its photo rows run.
 	const note = str(f.get('note'), 400);
-	await batch(
+	const done = await batch(
 		teamIds.flatMap((teamId) => [
 			q(
 				'INSERT INTO grant_award (game_id, team_id, user_id, title, note, points, created_at) VALUES (?, ?, NULL, ?, ?, ?, ?)',
@@ -28,5 +29,10 @@ export async function giveTeamPoints(game: Game, f: FormData, photoIds: number[]
 			)
 		])
 	);
+	// Each team's grant is the first statement of its pair; its comment goes in the thread of every photo it came from.
+	teamIds.forEach((_, i) => {
+		const grantId = done[i * 2].meta.last_row_id;
+		for (const photoId of photoIds) announce('points.granted', photoId, { grantId });
+	});
 	return null;
 }

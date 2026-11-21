@@ -56,6 +56,9 @@ GET|POST         /api/v1/games/:code/awards {name, description, points, scope}
 PATCH|DELETE     /api/v1/games/:code/awards/:id       (PATCH may set status: draft|open|closed)
 GET              /api/v1/games/:code/photos?category=&team=&status=&user=&limit=
 PATCH|DELETE     /api/v1/games/:code/photos/:id       (PATCH: status ok|disqualified, points_override)
+GET|POST         /api/v1/games/:code/webhooks {name, kind: ember|json, url, secret?, events?, hidden_ok?, active?}
+PATCH|DELETE     /api/v1/games/:code/webhooks/:id     (PATCH: same fields; a blank url or secret keeps the old one)
+POST             /api/v1/games/:code/webhooks/:id/test
 GET|POST         /api/v1/games/:code/players {email, name?}
 PATCH|DELETE     /api/v1/games/:code/players/:userId  (PATCH: team_id)
 GET|PUT          /api/v1/settings                     (site:read / site:write: signups, maxGames, maxPhotos, mailFrom)
@@ -64,10 +67,27 @@ GET              /api/v1/logs/summary                       (counts per kind ove
 GET|POST         /api/v1/people {name, email, game?}  (site:read / site:write)
 ```
 
+## Webhooks
+
+A game can tell a chat room or another service when things happen (`games:read` to list, `games:write` to change). The
+address holds a secret key, so it is write-only: lists show only its origin. In the app: Game admin → Webhooks.
+
+Events (`events` defaults to all): `photo.added`, `photo.filed`, `photo.scored`, `photo.disqualified`, `photo.restored`,
+`photo.review`, `points.granted`.
+
+- `kind: ember` posts to an Ember or Campfire room's bot address (`https://<chat>/rooms/<room>/<bot key>/messages`).
+  A new photo is posted as the picture, which starts its thread; the who/where/caption line and every later event about that
+  photo (points, disqualified, ...) are comments in that thread. A grant with no photo is a plain message.
+- `kind: json` POSTs `{event, at, game, photo, message, ...}` with `X-Photogame-Event`, and `X-Photogame-Signature:
+  sha256=<hex HMAC-SHA256 of the raw body>` when a `secret` is set.
+- A hidden game's photos reach a webhook only after they are revealed, unless it has `hidden_ok`.
+- Delivery happens after the response, once, with an 8 second timeout and no retries. `last_at` and `last_status` on the
+  webhook show the latest result, and failures also land in the error log as `webhook_failed`.
+
 ## The error log
 
 The app keeps its own small log (30 days, at most 5000 rows) of things you'd otherwise dig out of the Cloudflare
-dashboard: `server_error` (unexpected server errors with stack), `api_error`, `mail_failed` (Resend refused an email,
+dashboard: `server_error` (unexpected server errors with stack), `api_error`, `webhook_failed` (a webhook could not deliver, with its id and event), `mail_failed` (Resend refused an email,
 status and reason), `turnstile_failed` (bot check failed on a sign-up form; `tokenEmpty: true` means the form was sent
 before the check finished), and `client_error` (JavaScript errors reported by people's browsers, with their
 user-agent, so phone-only problems show up). No email addresses, sign-in codes or email bodies are stored.

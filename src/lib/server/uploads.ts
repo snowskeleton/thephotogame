@@ -4,6 +4,7 @@ import { str, type Game, type Viewer } from './game.ts';
 import { claimStatements } from './claims.ts';
 import { remove, sniff, store } from './images.ts';
 import { settings } from './settings.ts';
+import { announce } from './webhooks.ts';
 
 export type Category = { id: number; name: string; active: number };
 
@@ -55,6 +56,8 @@ export async function savePhotos(game: Game, viewer: Viewer, f: FormData, catego
 	}
 	// Points are the host's call; a player's own claim is never stored.
 	if (category && viewer.isHost) await batch(await claimStatements(id, category.id, f));
+	announce('photo.added', id);
+	if (category && viewer.isHost) announce('photo.scored', id);
 	return { added: 1 };
 }
 
@@ -78,6 +81,7 @@ export async function fileInto(photoId: number, categoryId: number, wasUnsorted:
 		...(wasUnsorted ? [q('UPDATE photo SET created_at = ? WHERE id = ?', now(), photoId)] : []),
 		q('DELETE FROM photo_claim WHERE photo_id = ?', photoId)
 	]);
+	announce('photo.filed', photoId);
 }
 
 export function unsortedFor(gameId: number, userId: number) {
