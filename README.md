@@ -128,6 +128,7 @@ The migration `0004_api_keys.sql` applies itself on the first request after depl
 ```
 npm test            # unit tests: server modules against a real local D1 and R2 (a few seconds)
 npm run test:e2e    # builds the app, then drives the built Worker over HTTP (about 30 seconds)
+npm run test:ui     # builds, then real Chromium (desktop and phone sizes) against the built Worker
 npm run test:all
 ```
 
@@ -138,3 +139,8 @@ storage. They need no Cloudflare account and never touch real data. Test binding
   uploads, logging, migrations.
 - `tests/e2e/` signs people in with seeded sessions (one test does the real emailed-code flow) and checks what each
   role can open, upload, score, vote on and delete, plus the JSON API.
+
+`test:ui` starts `wrangler dev --local` with throwaway storage on port 8799 and drives it with Playwright. First run:
+`npx playwright install chromium`. Tests sign people in with seeded sessions (one signs in with the real emailed code,
+read from the Worker's log, and one saves and uses a passkey on a virtual authenticator). Every test fails on a page
+error, a 5xx, or a `server_error`/`client_error` row the app logged while it ran.

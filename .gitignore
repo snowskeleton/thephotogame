@@ -27,3 +27,8 @@ vite.config.ts.timestamp-*
 
 # Local Worker variables and secrets
 .dev.vars
+
+# Playwright
+/tests/ui/.run
+/test-results
+/playwright-report
