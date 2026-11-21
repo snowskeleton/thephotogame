@@ -42,7 +42,16 @@
 			<strong>{pts(data.score.points)}{#if !data.score.counted && p.status !== 'disqualified'} <span class="muted small">(claims {pts(data.score.claimed)})</span>{/if}</strong>
 		</div>
 		{#each data.grants as g}
-			<div class="spread small"><span>🏅 {g.team}: {g.title}</span><span>+{pts(g.points)}</span></div>
+			<div class="spread small"><span>🏅 {g.team}: {g.title}</span>
+				<span class="row" style="gap:8px;flex-wrap:nowrap">
+					{g.points >= 0 ? '+' : ''}{pts(g.points)}
+					{#if data.isHost}
+						<form method="POST" action="?/removeCredit" use:enhance onsubmit={(e) => { if (!confirm(`Remove ${g.team}'s points from this photo?`)) e.preventDefault(); }}>
+							<input type="hidden" name="id" value={g.id} />
+							<button class="sm danger" aria-label="Remove these points">✕</button>
+						</form>
+					{/if}
+				</span></div>
 		{/each}
 	</div>
 </div>
@@ -98,7 +107,7 @@
 						<label class="check"><input type="checkbox" name="team" value={t.id} /> <span class="grow">{t.name}</span></label>
 					{/each}
 				</fieldset>
-				<label>Points each <input name="points" inputmode="decimal" value="1" /></label>
+				<label>Points each (negative takes points away) <input name="points" inputmode="decimal" value="1" /></label>
 				<label>Reason <input name="title" required maxlength="80" value="Also in the photo" /></label>
 				{#if form?.giveError}<p class="err small" style="margin:0">{form.giveError}</p>{/if}
 				{#if form?.gave}<p class="ok small" style="margin:0">Points given.</p>{/if}

@@ -46,8 +46,8 @@ export const load = async (event) => {
 			mine: (await get<{ agree: number }>('SELECT agree FROM review_vote WHERE photo_id = ? AND user_id = ?', photo.id, viewer.user.id))
 				?.agree ?? null
 		},
-		grants: await all<{ title: string; points: number; team: string }>(
-			`SELECT g.title, g.points, t.name AS team FROM grant_photo gp JOIN grant_award g ON g.id = gp.grant_id
+		grants: await all<{ id: number; title: string; points: number; team: string }>(
+			`SELECT g.id, g.title, g.points, t.name AS team FROM grant_photo gp JOIN grant_award g ON g.id = gp.grant_id
 			 JOIN team t ON t.id = g.team_id WHERE gp.photo_id = ?`,
 			photo.id
 		),
@@ -136,6 +136,17 @@ export const actions = {
 		const err = await giveTeamPoints(game, await event.request.formData(), [photo.id]);
 		if (err) return fail(400, { giveError: err });
 		return { gave: true };
+	},
+	removeCredit: async (event) => {
+		const { game, viewer, photo } = await ctx(event);
+		if (!viewer.isHost) return fail(403, { error: 'Admins only' });
+		const id = Number((await event.request.formData()).get('id'));
+		// Only credits attached to this photo can be removed from here.
+		await run(
+			'DELETE FROM grant_award WHERE id = ? AND game_id = ? AND id IN (SELECT grant_id FROM grant_photo WHERE photo_id = ?)',
+			id, game.id, photo.id
+		);
+		return { removed: true };
 	},
 	adjust: async (event) => {
 		const { viewer, photo } = await ctx(event);
