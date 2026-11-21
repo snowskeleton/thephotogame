@@ -96,7 +96,7 @@ test.describe('the host scores photos', () => {
 		await hostPage.getByText('Edit photo').click();
 		await hostPage.getByRole('button', { name: 'Save', exact: true }).first().click();
 		await expect(hostPage.getByText('Saved.')).toBeVisible();
-		await expect(hostPage.getByText('Found it')).toBeVisible();
+		await expect(hostPage.getByText('Found it').first()).toBeVisible();
 		expect(site.claims(world.g.id).map((c) => ({ option_id: c.option_id }))).toEqual([{ option_id: world.hats.option }]);
 
 		// The player's board and the leaderboard show the points.
