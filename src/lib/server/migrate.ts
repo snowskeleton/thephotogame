@@ -11,13 +11,21 @@ const files = Object.entries(
 	.map(([path, sql]) => ({ name: path.split('/').pop()!, sql }))
 	.sort((a, b) => a.name.localeCompare(b.name));
 
-/** One statement per entry: comments dropped, split on semicolons (our migrations have none inside strings). */
-const statements = (sql: string) =>
-	sql
-		.replace(/--[^\n]*/g, '')
-		.split(';')
-		.map((s) => s.trim())
-		.filter(Boolean);
+/**
+ * One statement per entry: comments dropped, split on semicolons (our migrations have none inside strings).
+ * A CREATE TRIGGER has semicolons inside its BEGIN ... END, so its pieces are glued back together.
+ */
+function statements(sql: string): string[] {
+	const out: string[] = [];
+	let open = '';
+	for (const piece of sql.replace(/--[^\n]*/g, '').split(';')) {
+		const s = (open ? `${open};${piece}` : piece).trim();
+		if (!s) continue;
+		if (/^CREATE\s+(?:TEMP\s+)?TRIGGER\b/i.test(s) && !/\bEND$/i.test(s)) open = s;
+		else (out.push(s), (open = ''));
+	}
+	return out;
+}
 
 async function pending(): Promise<typeof files> {
 	const db = config().DB;

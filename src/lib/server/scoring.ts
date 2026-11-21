@@ -213,13 +213,13 @@ const unpack = (json: string): Scores => {
 
 /**
  * A game's scores, from the stored copy while it's current. The copy is rebuilt on the first read after
- * anything that feeds scoring changes (see db.ts), so most page views cost one small read, not a recount.
+ * anything that feeds scoring changes (triggers in migration 0009 bump the game's score_epoch), so most page views cost one small read, not a recount.
  */
 export async function scoreGame(game: Game): Promise<Scores> {
 	// A broken or missing cache must never break a page: fall back to counting.
 	const row = await get<{ n: number; epoch: number | null; json: string | null }>(
-		`SELECT (SELECT n FROM score_epoch WHERE id = 1) AS n, c.epoch, c.json
-		 FROM (SELECT 1) LEFT JOIN score_cache c ON c.game_id = ?`,
+		`SELECT g.score_epoch AS n, c.epoch, c.json
+		 FROM game g LEFT JOIN score_cache c ON c.game_id = g.id WHERE g.id = ?`,
 		game.id
 	).catch(() => undefined);
 	if (row?.json && row.epoch === row.n) {
