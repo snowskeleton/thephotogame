@@ -15,7 +15,7 @@ and photo bucket on the first deploy. The app sets up its own tables.
 1. In the Cloudflare dashboard: **Workers & Pages → Create → Import a
    repository**, and pick this repo. Keep the name `thephotogame` (it has to
    match `wrangler.jsonc`), leave the deploy command as `npx wrangler deploy`,
-   and choose the branch to deploy from. The build command can stay empty:
+   and set the production branch to `main`. The build command can stay empty:
    `wrangler deploy` builds the app itself.
 2. Once it's deployed, open the Worker's **Settings → Variables and Secrets**
    and add:
@@ -39,7 +39,7 @@ and photo bucket on the first deploy. The app sets up its own tables.
    so email reaches everyone. Check the sign-up switch and limits while you're
    there.
 
-Every push to that branch deploys again.
+Every push to `main` deploys again. Other branches get a preview build.
 
 **Optional, all under Settings → Variables and Secrets:**
 
