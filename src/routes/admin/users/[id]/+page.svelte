@@ -5,7 +5,12 @@
 	let { data, form } = $props();
 	const u = $derived(data.u);
 	const date = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-	const ask = (msg: string) => (e: SubmitEvent) => {
+	// A confirm has to cancel inside enhance: an onsubmit handler runs after enhance has already sent the request.
+	const ask = (msg: string) => ({ cancel }: { cancel: () => void }) => {
+		if (!confirm(msg)) cancel();
+	};
+	// For forms without use:enhance, where the browser's own submit is what gets stopped.
+	const askPlain = (msg: string) => (e: SubmitEvent) => {
 		if (!confirm(msg)) e.preventDefault();
 	};
 </script>
@@ -51,7 +56,7 @@
 						{#if m.role === 'host'}<span class="pill">host</span>{/if}
 						{#if m.status === 'invited'}<span class="pill warn">invited</span>{/if}
 					</span>
-					<form method="POST" action="?/leaveGame" use:enhance onsubmit={ask(`Take ${u.name} out of ${m.name}? Their photos stay.`)}>
+					<form method="POST" action="?/leaveGame" use:enhance={ask(`Take ${u.name} out of ${m.name}? Their photos stay.`)}>
 						<input type="hidden" name="game" value={m.game_id} />
 						<button class="sm danger">Remove</button>
 					</form>
@@ -97,13 +102,13 @@
 				<form method="POST" action="?/email" use:enhance><button>Email an invite link</button></form>
 			{/if}
 			{#if data.devices}
-				<form method="POST" action="?/signout" use:enhance onsubmit={ask(`Sign ${u.name} out on every device?`)}>
+				<form method="POST" action="?/signout" use:enhance={ask(`Sign ${u.name} out on every device?`)}>
 					<button>Sign out everywhere</button>
 				</form>
 			{/if}
 		</div>
 		{#each data.passkeys as p, i}
-			<form method="POST" action="?/forget" class="spread" use:enhance onsubmit={ask('Remove this passkey?')}>
+			<form method="POST" action="?/forget" class="spread" use:enhance={ask('Remove this passkey?')}>
 				<span>Passkey {i + 1} <span class="muted small">added {date(p.created_at)}</span></span>
 				<input type="hidden" name="key" value={p.id} />
 				<button class="sm danger">Remove</button>
@@ -112,7 +117,7 @@
 	</div>
 
 	{#if !data.isMe}
-		<form method="POST" action="?/delete" onsubmit={ask(`Delete ${u.name} and their ${plural(data.photos, 'photo')}? This can’t be undone.`)}>
+		<form method="POST" action="?/delete" onsubmit={askPlain(`Delete ${u.name} and their ${plural(data.photos, 'photo')}? This can’t be undone.`)}>
 			<button class="danger block">Delete {u.name}</button>
 		</form>
 	{/if}
