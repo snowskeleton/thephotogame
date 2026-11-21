@@ -10,21 +10,18 @@ function read(): Record<string, string> {
 	}
 }
 
+// `get` runs inside $derived expressions, where Svelte forbids writing state, so reading never writes:
+// the saved copy starts empty and is filled in by `load()` (called once from onMount) and `set()`.
 let saved = $state<Record<string, string>>({});
-let loaded = false;
 
 export const galleryMemory = {
-	get(code: string): string {
-		if (!loaded && typeof sessionStorage !== 'undefined') {
-			saved = read();
-			loaded = true;
-		}
-		return saved[code] ?? '';
+	get: (code: string): string => saved[code] ?? '',
+	load() {
+		saved = read();
 	},
 	set(code: string, search: string) {
-		if (typeof sessionStorage === 'undefined') return;
-		if (!loaded) (saved = read()), (loaded = true);
-		saved = { ...saved, [code]: search };
+		if (saved[code] === search) return;
+		saved = { ...read(), ...saved, [code]: search };
 		try {
 			sessionStorage.setItem(KEY, JSON.stringify(saved));
 		} catch {

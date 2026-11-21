@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { tv } from '#lib/colors.ts';
 	import { page } from '$app/state';
+	import { onMount } from 'svelte';
 	import { galleryMemory } from '#lib/galleryMemory.svelte.ts';
 	let { children, data } = $props();
+	onMount(() => galleryMemory.load());
 	const base = $derived(`/g/${data.game.code}`);
 	const tabs = $derived([
 		{ href: base, icon: '🎯', label: 'Board', on: page.url.pathname === base || page.url.pathname.startsWith(base + '/c/') },
