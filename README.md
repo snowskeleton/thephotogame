@@ -122,3 +122,19 @@ browser should be blocked, while photos in the app still load. Leave
 
 Site admins and game hosts can make scoped API keys under **Account → API keys**; see [docs/API.md](docs/API.md).
 The migration `0004_api_keys.sql` applies itself on the first request after deploy.
+
+## Tests
+
+```
+npm test            # unit tests: server modules against a real local D1 and R2 (a few seconds)
+npm run test:e2e    # builds the app, then drives the built Worker over HTTP (about 30 seconds)
+npm run test:all
+```
+
+Both run in workerd through `@cloudflare/vitest-plugin`, the same runtime as production, with throwaway local
+storage. They need no Cloudflare account and never touch real data. Test bindings live in `tests/wrangler*.jsonc`.
+
+- `tests/unit/` calls the modules in `src/lib/server` directly: scoring, claims, grants, auth, API-key permissions,
+  uploads, logging, migrations.
+- `tests/e2e/` signs people in with seeded sessions (one test does the real emailed-code flow) and checks what each
+  role can open, upload, score, vote on and delete, plus the JSON API.

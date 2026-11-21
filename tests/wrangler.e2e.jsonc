@@ -1,0 +1,11 @@
+{
+	// The built Worker (npm run build) with local D1 and R2, for HTTP-level tests through SELF.fetch.
+	"name": "thephotogame-e2e",
+	"main": "../.svelte-kit/cloudflare/_worker.js",
+	"compatibility_date": "2026-11-01",
+	"compatibility_flags": ["nodejs_compat"],
+	"assets": { "binding": "ASSETS", "directory": "../.svelte-kit/cloudflare" },
+	"d1_databases": [{ "binding": "DB", "database_name": "test", "database_id": "00000000-0000-0000-0000-000000000000" }],
+	"r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "test-photos" }],
+	"vars": { "OWNER_EMAIL": "owner@example.com" }
+}
