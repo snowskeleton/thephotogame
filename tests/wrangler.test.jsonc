@@ -1,0 +1,10 @@
+{
+	// Bindings for unit tests only: same names as the real wrangler.jsonc, but no Worker entry point,
+	// and local-only storage that vitest creates fresh for every run.
+	"name": "thephotogame-test",
+	"compatibility_date": "2026-11-01",
+	"compatibility_flags": ["nodejs_compat"],
+	"d1_databases": [{ "binding": "DB", "database_name": "test", "database_id": "00000000-0000-0000-0000-000000000000" }],
+	"r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "test-photos" }],
+	"vars": { "OWNER_EMAIL": "owner@example.com" }
+}
