@@ -200,3 +200,16 @@ request with a progress bar, so a big batch doesn't fail as a whole.
 In hidden mode a player sees their own team's photos, plus anything uploaded
 before the last reveal. "Reveal now" makes everything uploaded so far visible;
 doubting and voting only apply to photos a player can see.
+
+## Browsing photos
+
+The gallery filters by category, team, person, day and (for hosts) unscored, all in the URL. Opening a photo
+from the gallery adds `from=gallery` plus the same filters, so the photo page shows "Gallery: <filters>",
+a position count, Newer/Older buttons within that list, and a Back link to the same filtered list. Deleting
+a photo returns to the list too. The Gallery tab remembers the last filters for the browser tab
+(`galleryMemory`); "Clear filters" resets them. Each photo links to "All from <person>" and "All from <team>".
+
+Scoring options come in three kinds: a **base** line (pick one), an **extra** (per item, with a count) and a
+**bonus** (a flat add-on that is ticked or not). Bonuses stack with the base line, extras and each other.
+Players add a caption when they sort a photo on the board (saved as soon as they leave the field) or when
+they upload straight into a category.

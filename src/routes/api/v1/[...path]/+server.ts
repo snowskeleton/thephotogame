@@ -179,11 +179,11 @@ const routes: Route[] = [
 		const b = c.body;
 		const name = 'name' in b ? str(b.name, 80) : cat.name;
 		if (!name) throw bad('name can’t be empty');
-		// `options` (optional) replaces the scoring lines: {id?, label, points, kind: 'tier'|'extra'}.
+		// `options` (optional) replaces the scoring lines: {id?, label, points, kind: 'tier'|'extra'|'bonus'}.
 		let opts: { id: number; label: string; points: number; kind: string }[] | null = null;
 		if (Array.isArray(b.options)) {
 			opts = (b.options as Record<string, unknown>[])
-				.map((o) => ({ id: Number(o.id) || 0, label: str(o.label, 120), points: num(o.points), kind: o.kind === 'extra' ? 'extra' : 'tier' }))
+				.map((o) => ({ id: Number(o.id) || 0, label: str(o.label, 120), points: num(o.points), kind: o.kind === 'extra' || o.kind === 'bonus' ? o.kind : 'tier' }))
 				.filter((o) => o.label);
 			if (!opts.some((o) => o.kind === 'tier')) throw bad('options needs at least one base line (kind "tier")');
 		}

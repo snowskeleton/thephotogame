@@ -4,6 +4,7 @@
 	let { options, claims = [] }: { options: Option[]; claims?: { option_id: number; qty: number }[] } = $props();
 	const tiers = $derived(options.filter((o) => o.kind === 'tier'));
 	const extras = $derived(options.filter((o) => o.kind === 'extra'));
+	const bonuses = $derived(options.filter((o) => o.kind === 'bonus'));
 	const has = (id: number) => claims.find((c) => c.option_id === id);
 </script>
 
@@ -27,6 +28,17 @@
 			<label class="check">
 				<input type="number" name="extra_{o.id}" min="0" max="99" step="1" inputmode="numeric" defaultValue={has(o.id)?.qty ?? 0} style="width:72px" />
 				<span class="grow">{o.label}</span><span class="pill">+{pts(o.points)} each</span>
+			</label>
+		{/each}
+	</fieldset>
+{/if}
+{#if bonuses.length}
+	<fieldset>
+		<legend>Bonuses (they stack)</legend>
+		{#each bonuses as o}
+			<label class="check">
+				<input type="checkbox" name="bonus_{o.id}" value="1" checked={!!has(o.id)} />
+				<span class="grow">{o.label}</span><span class="pill">+{pts(o.points)}</span>
 			</label>
 		{/each}
 	</fieldset>

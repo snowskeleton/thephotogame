@@ -1,29 +1,22 @@
 import { all } from '#lib/server/db.ts';
 import { enter } from '#lib/server/game.ts';
-import { listPhotos } from '#lib/server/photos.ts';
+import { browseFilter, listPhotos } from '#lib/server/photos.ts';
 import { scoreGame } from '#lib/server/scoring.ts';
 
 export const load = async ({ params, locals, url }) => {
 	const { game, viewer } = await enter(locals, params.code);
-	const filter = {
-		cat: Number(url.searchParams.get('cat')) || undefined,
-		team: Number(url.searchParams.get('team')) || undefined,
-		day: url.searchParams.get('day') || undefined,
-		unscored: viewer.isHost && url.searchParams.get('unscored') === '1'
-	};
+	const filter = browseFilter(url, viewer.isHost);
 	// Hosts see each photo's scoring state and can filter to the ones that still need points.
 	const scores = viewer.isHost ? (await scoreGame(game)).photoScores : null;
-	const withScores = async () => {
-		const rows = await listPhotos(game, viewer, filter);
-		if (!scores) return rows;
-		const scored = rows.map((p) => ({ ...p, score: scores.get(p.id) }));
-		return filter.unscored ? scored.filter((p) => p.score?.pending) : scored;
-	};
+	const rows = await listPhotos(game, viewer, filter);
+	const photos = rows.map((p) => ({ ...p, score: scores?.get(p.id) }));
 	const everything = await listPhotos(game, viewer);
+	const people = new Map(everything.map((p) => [p.user_id, p.who]));
 	return {
 		filter,
-		photos: await withScores(),
+		photos: filter.unscored ? photos.filter((p) => p.score?.pending) : photos,
 		days: [...new Set(everything.map((p) => p.day))],
+		people: [...people].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)),
 		hiddenCount: viewer.isHost
 			? 0
 			: ((await all<{ n: number }>('SELECT COUNT(*) AS n FROM photo WHERE game_id = ? AND category_id IS NOT NULL', game.id))[0].n - everything.length),

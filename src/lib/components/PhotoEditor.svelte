@@ -10,7 +10,8 @@
 		options,
 		claims,
 		categories,
-		canScore = false
+		canScore = false,
+		context = ''
 	}: {
 		photo: { id: number; category_id: number; caption: string };
 		code: string;
@@ -19,6 +20,8 @@
 		categories: { id: number; name: string }[];
 		/** Only the host assigns points. */
 		canScore?: boolean;
+		/** Query string of the list this photo was opened from ("?from=gallery&…"); kept when the photo is deleted. */
+		context?: string;
 	} = $props();
 
 	// The editor posts to the photo page's actions, so it works the same wherever it's shown.
@@ -63,6 +66,6 @@
 	{#if err}<p class="err small" style="margin:0">{err}</p>{/if}
 	<button class="primary" disabled={busy}>{moving ? 'Move photo' : 'Save'}</button>
 </form>
-<form method="POST" action="{action}?/delete" use:enhance={submit}>
+<form method="POST" action="{action}?/delete{context ? `&${context.slice(1)}` : ''}" use:enhance={submit}>
 	<button class="danger block sm" disabled={busy}>Delete photo</button>
 </form>

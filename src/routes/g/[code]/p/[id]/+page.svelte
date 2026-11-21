@@ -9,7 +9,14 @@
 	const canDoubt = $derived(!data.ours && !!data.team && p.status !== 'disqualified');
 </script>
 
-<a class="muted small" href="{base}/c/{p.category_id}">← {p.category}</a>
+{#if data.nav}
+	<div class="spread small" style="gap:8px">
+		<a class="muted" href={data.nav.back}>← Gallery{data.nav.label ? `: ${data.nav.label}` : ''}</a>
+		<span class="muted">{data.nav.index ? `${data.nav.index} / ` : ''}{data.nav.total}</span>
+	</div>
+{:else}
+	<a class="muted small" href="{base}/c/{p.category_id}">← {p.category}</a>
+{/if}
 
 {#if data.isNew}<p class="card ok" style="margin-top:8px">Got it! Your photo is in.</p>{/if}
 
@@ -17,12 +24,23 @@
 	<a href="/media/{p.id}/original" target="_blank" rel="noopener"><img src="/media/{p.id}/large" alt={p.caption || p.category} style="aspect-ratio:{p.width}/{p.height}" /></a>
 </div>
 
+{#if data.nav && (data.nav.prev || data.nav.next)}
+	<div class="row" style="margin-bottom:10px;flex-wrap:nowrap">
+		{#if data.nav.prev}<a class="btn grow" href={data.nav.prev} data-sveltekit-replacestate>← Newer</a>{:else}<span class="grow"></span>{/if}
+		{#if data.nav.next}<a class="btn grow" href={data.nav.next} data-sveltekit-replacestate>Older →</a>{:else}<span class="grow"></span>{/if}
+	</div>
+{/if}
+
 <div class="card stack" style="{tv(p.color)}">
 	<div class="spread">
 		<span class="pill team">{p.who} · {p.team}</span>
 		<span class="muted small">{new Date(p.created_at).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' })}</span>
 	</div>
 	{#if p.caption}<p style="margin:0">{p.caption}</p>{/if}
+	<div class="row small" style="gap:12px">
+		<a href="{base}/gallery?user={p.user_id}">All from {p.who}</a>
+		<a href="{base}/gallery?team={p.team_id}">All from {p.team}</a>
+	</div>
 
 	<div>
 		{#each data.claims as c}
@@ -81,7 +99,7 @@
 	<details class="card">
 		<summary>Edit photo</summary>
 		<div class="stack" style="margin-top:12px">
-			<PhotoEditor photo={p} code={data.game.code} options={data.options} claims={data.claims} categories={data.categories} canScore={data.isHost} />
+			<PhotoEditor photo={p} code={data.game.code} options={data.options} claims={data.claims} categories={data.categories} canScore={data.isHost} context={data.nav?.context ?? ''} />
 		</div>
 	</details>
 {/if}

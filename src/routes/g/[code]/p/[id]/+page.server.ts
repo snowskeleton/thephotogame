@@ -4,7 +4,8 @@ import { canSee, enter, num, str } from '#lib/server/game.ts';
 import { optionsFor, saveClaims } from '#lib/server/claims.ts';
 import { remove } from '#lib/server/images.ts';
 import { giveTeamPoints } from '#lib/server/grants.ts';
-import { onePhoto } from '#lib/server/photos.ts';
+import { browseFilter, listPhotos, onePhoto } from '#lib/server/photos.ts';
+import { browseQuery, fromGallery } from '#lib/browse.ts';
 import { scoreGame } from '#lib/server/scoring.ts';
 import { categoryIn, fileInto } from '#lib/server/uploads.ts';
 
@@ -17,6 +18,37 @@ async function ctx(event: { params: { code: string; id: string }; locals: App.Lo
 	const ours = photo.team_id === viewer.teamId;
 	return { game, viewer, photo, mine, ours };
 }
+/** Where this photo was opened from: a filtered gallery list, with the photos before and after it. */
+async function browseNav(event: { url: URL }, game: Awaited<ReturnType<typeof ctx>>['game'], viewer: Awaited<ReturnType<typeof ctx>>['viewer'], id: number) {
+	if (event.url.searchParams.get('from') !== 'gallery') return null;
+	const filter = browseFilter(event.url, viewer.isHost);
+	const query = browseQuery(filter);
+	let rows = await listPhotos(game, viewer, filter);
+	if (filter.unscored) {
+		const scores = (await scoreGame(game)).photoScores;
+		rows = rows.filter((p) => scores.get(p.id)?.pending || p.id === id);
+	}
+	const i = rows.findIndex((p) => p.id === id);
+	const link = (p?: { id: number }) => (p ? `/g/${game.code}/p/${p.id}${fromGallery(query)}` : null);
+	const names = [
+		filter.user && (await get<{ name: string }>('SELECT name FROM user WHERE id = ?', filter.user))?.name,
+		filter.team && (await get<{ name: string }>('SELECT name FROM team WHERE id = ? AND game_id = ?', filter.team, game.id))?.name,
+		filter.cat && (await get<{ name: string }>('SELECT name FROM category WHERE id = ? AND game_id = ?', filter.cat, game.id))?.name,
+		filter.day,
+		filter.unscored && 'unscored'
+	].filter(Boolean);
+	return {
+		back: `/g/${game.code}/gallery${query}`,
+		label: names.join(' · '),
+		index: i + 1,
+		total: rows.length,
+		prev: i > 0 ? link(rows[i - 1]) : null,
+		next: i >= 0 ? link(rows[i + 1]) : null,
+		// For the editor's forms, so a delete can come back to the same list.
+		context: fromGallery(query)
+	};
+}
+
 const doubtCount = async (id: number) => (await get<{ n: number }>('SELECT COUNT(*) AS n FROM doubt WHERE photo_id = ?', id))!.n;
 
 export const load = async (event) => {
@@ -60,6 +92,7 @@ export const load = async (event) => {
 		otherTeams: viewer.isHost
 			? await all<{ id: number; name: string }>('SELECT id, name FROM team WHERE game_id = ? AND id != ? ORDER BY id', game.id, photo.team_id)
 			: [],
+		nav: await browseNav(event, game, viewer, photo.id),
 		isNew: event.url.searchParams.has('new')
 	};
 };
@@ -118,6 +151,8 @@ export const actions = {
 		);
 		const gone = await get<{ id: number; ext: string }>('DELETE FROM photo WHERE id = ? RETURNING id, ext', photo.id);
 		if (gone) await remove([gone]);
+		if (event.url.searchParams.get('from') === 'gallery')
+			redirect(303, `/g/${game.code}/gallery${browseQuery(browseFilter(event.url, viewer.isHost))}`);
 		redirect(303, `/g/${game.code}/c/${photo.category_id}`);
 	},
 	// Admin only below.

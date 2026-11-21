@@ -4,6 +4,7 @@
 		photo,
 		code,
 		tag = '',
+		context = '',
 		showScore = false
 	}: {
 		/** Hosts see which photos still need points. */
@@ -11,10 +12,12 @@
 		photo: { id: number; color: string; status?: string; caption?: string; score?: { pending: boolean; points: number; counted: boolean } };
 		code: string;
 		tag?: string;
+		/** Query string for the photo page (see fromGallery), so it can offer Next/Back within this list. */
+		context?: string;
 	} = $props();
 </script>
 
-<a class="ph" class:off={photo.status === 'disqualified'} href="/g/{code}/p/{photo.id}" style="{tv(photo.color)}">
+<a class="ph" class:off={photo.status === 'disqualified'} href="/g/{code}/p/{photo.id}{context}" style="{tv(photo.color)}">
 	<img src="/media/{photo.id}/thumb" alt={photo.caption || 'Photo'} loading="lazy" />
 	{#if photo.status === 'review'}<span class="tag">⚠️ review</span>
 	{:else if photo.status === 'disqualified'}<span class="tag">✖ out</span>

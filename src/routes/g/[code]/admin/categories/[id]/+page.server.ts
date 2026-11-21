@@ -33,7 +33,7 @@ export const actions = {
 		const ids = f.getAll('opt_id').map(Number);
 		const labels = f.getAll('opt_label').map((v) => str(v, 120));
 		const points = f.getAll('opt_points').map((v) => num(v));
-		const kinds = f.getAll('opt_kind').map((v) => (v === 'extra' ? 'extra' : 'tier'));
+		const kinds = f.getAll('opt_kind').map((v) => (v === 'extra' || v === 'bonus' ? v : 'tier'));
 		const rows = ids.map((id, i) => ({ id, label: labels[i], points: points[i], kind: kinds[i] })).filter((r) => r.label);
 		if (!rows.some((r) => r.kind === 'tier'))
 			return fail(400, { error: 'Add at least one base scoring line (not an extra), even if it’s worth 0.' });

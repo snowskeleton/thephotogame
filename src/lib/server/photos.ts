@@ -1,4 +1,5 @@
 import { all, config } from './db.ts';
+import type { BrowseFilter } from '../browse.ts';
 import { visibleSql, type Game, type Viewer } from './game.ts';
 
 export type PhotoRow = {
@@ -34,13 +35,14 @@ const withDay = (rows: Omit<PhotoRow, 'day'>[]): PhotoRow[] => rows.map((p) => (
 export async function listPhotos(
 	game: Game,
 	viewer: Viewer,
-	f: { cat?: number; team?: number; day?: string; status?: string; oldestFirst?: boolean } = {}
+	f: { cat?: number; team?: number; user?: number; day?: string; status?: string; oldestFirst?: boolean } = {}
 ): Promise<PhotoRow[]> {
 	const vis = visibleSql(game, viewer);
 	const where = ['p.game_id = ?', vis.sql];
 	const params: (number | string)[] = [game.id, ...vis.params];
 	if (f.cat) (where.push('p.category_id = ?'), params.push(f.cat));
 	if (f.team) (where.push('p.team_id = ?'), params.push(f.team));
+	if (f.user) (where.push('p.user_id = ?'), params.push(f.user));
 	if (f.status) (where.push('p.status = ?'), params.push(f.status));
 	const rows = withDay(
 		await all(`${SELECT} WHERE ${where.join(' AND ')} ORDER BY p.created_at ${f.oldestFirst ? 'ASC' : 'DESC'}`, ...params)
@@ -50,4 +52,16 @@ export async function listPhotos(
 
 export async function onePhoto(gameId: number, id: number): Promise<PhotoRow | undefined> {
 	return withDay(await all(`${SELECT} WHERE p.game_id = ? AND p.id = ?`, gameId, id))[0];
+}
+
+/** The gallery filters carried in a URL's query string (gallery, slideshow and photo pages all share them). */
+export function browseFilter(url: URL, isHost: boolean): BrowseFilter {
+	const p = url.searchParams;
+	return {
+		cat: Number(p.get('cat')) || undefined,
+		team: Number(p.get('team')) || undefined,
+		user: Number(p.get('user')) || undefined,
+		day: p.get('day') || undefined,
+		unscored: isHost && p.get('unscored') === '1'
+	};
 }

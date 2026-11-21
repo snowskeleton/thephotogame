@@ -26,7 +26,7 @@
 	<details class="card" style="{tv(t.color)};border-left:8px solid var(--team)">
 		<summary>
 			{t.name}
-			<span class="muted small">{t.members}{max ? `/${max}` : ''} players · {t.photos} photos</span>
+			<span class="muted small">{t.members}{max ? `/${max}` : ''} players · <a href="/g/{data.game.code}/gallery?team={t.id}" onclick={(e) => e.stopPropagation()}>{t.photos} photos</a></span>
 			{#if max && t.members > max}<span class="pill warn">oversized</span>{/if}
 		</summary>
 		<form method="POST" action="?/saveTeam" class="stack" style="margin-top:12px" use:enhance>
@@ -59,7 +59,7 @@
 				<strong>{p.name}</strong>
 				{#if p.role === 'host'}<span class="pill">host</span>{/if}
 				{#if p.status === 'invited'}<span class="pill warn">invited</span>{/if}
-				<div class="muted small" style="overflow-wrap:anywhere">{p.email} · {p.photos} photos</div>
+				<div class="muted small" style="overflow-wrap:anywhere">{p.email} · <a href="/g/{data.game.code}/gallery?user={p.id}">{p.photos} photos</a></div>
 			</div>
 			<form method="POST" action="?/assign" use:enhance>
 				<input type="hidden" name="user" value={p.id} />

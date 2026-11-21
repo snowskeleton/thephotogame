@@ -1,6 +1,6 @@
 import { all, batch, q } from './db.ts';
 
-export type Option = { id: number; label: string; points: number; kind: 'tier' | 'extra' };
+export type Option = { id: number; label: string; points: number; kind: 'tier' | 'extra' | 'bonus' };
 
 export function optionsFor(categoryId: number): Promise<Option[]> {
 	return all<Option>(
@@ -9,7 +9,7 @@ export function optionsFor(categoryId: number): Promise<Option[]> {
 	);
 }
 
-/** Replaces a photo's claims from a submitted form: `tier` = option id, `extra_<id>` = quantity. */
+/** Replaces a photo's claims from a submitted form: `tier` = option id, `extra_<id>` = quantity, `bonus_<id>` = checked. */
 export async function saveClaims(photoId: number, categoryId: number, f: FormData) {
 	await batch(await claimStatements(photoId, categoryId, f));
 }
@@ -25,5 +25,8 @@ export async function claimStatements(photoId: number, categoryId: number, f: Fo
 		const qty = Math.min(99, Math.max(0, Math.floor(Number(f.get(`extra_${o.id}`)) || 0)));
 		if (qty > 0) stmts.push(q('INSERT INTO photo_claim (photo_id, option_id, qty) VALUES (?, ?, ?)', photoId, o.id, qty));
 	}
+	// A bonus is a flat add-on that stacks on top of the tier and the extras.
+	for (const o of options.filter((o) => o.kind === 'bonus'))
+		if (f.get(`bonus_${o.id}`)) stmts.push(q('INSERT INTO photo_claim (photo_id, option_id, qty) VALUES (?, ?, 1)', photoId, o.id));
 	return stmts;
 }

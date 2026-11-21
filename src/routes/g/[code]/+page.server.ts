@@ -57,6 +57,9 @@ export const actions = {
 		const f = await request.formData();
 		const photo = await unsortedPhoto(f, game.id, viewer.user.id);
 		if (!photo) return fail(400, { error: 'That photo has already been sorted or deleted.' });
+		// The caption can be saved on its own, before a category is chosen.
+		await run('UPDATE photo SET caption = ? WHERE id = ?', str(f.get('caption'), 200), photo.id);
+		if (!f.get('category')) return { captioned: true };
 		const category = await categoryIn(game.id, f.get('category'));
 		if (!category) return fail(400, { error: 'Pick a category.' });
 		if (!game.submissions_open || !category.active) return fail(400, { error: 'Submissions are closed.' });

@@ -49,7 +49,7 @@ POST   /api/v1/games/:code/reveal | unreveal
 GET    /api/v1/games/:code/scores
 GET|POST         /api/v1/games/:code/categories {name, points}
 PATCH|DELETE     /api/v1/games/:code/categories/:id   (PATCH: name, rules, notes, day_label, scoring_cap, max_points, active,
-                                                       options:[{id?, label, points, kind: tier|extra}])
+                                                       options:[{id?, label, points, kind: tier|extra|bonus}])
 GET|POST         /api/v1/games/:code/teams {name, color}
 PATCH|DELETE     /api/v1/games/:code/teams/:id
 GET|POST         /api/v1/games/:code/awards {name, description, points, scope}

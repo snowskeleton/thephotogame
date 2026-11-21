@@ -61,7 +61,7 @@
 	<div class="card stack" style="border-color:var(--team);border-width:2px">
 		<div>
 			<h2 style="margin:0 0 2px">Add photos</h2>
-			<p class="muted small" style="margin:0">Pick as many as you like, then sort them into categories below.</p>
+			<p class="muted small" style="margin:0">Pick as many as you like, then add a caption and a category for each one below.</p>
 		</div>
 		<Uploader action="?/upload" auto label="📷 Upload photos" />
 	</div>
@@ -83,6 +83,8 @@
 				</a>
 				<form method="POST" action="?/file" class="grow stack" style="gap:6px" use:enhance>
 					<input type="hidden" name="photo_id" value={u.id} />
+					<input name="caption" maxlength="200" placeholder="Caption (optional)" aria-label="Caption" defaultValue={u.caption}
+						onchange={(e) => e.currentTarget.form?.requestSubmit()} />
 					<select name="category" aria-label="Category" disabled={!data.game.submissions_open}
 						onchange={(e) => e.currentTarget.value && e.currentTarget.form?.requestSubmit()}>
 						<option value="">Choose a category…</option>

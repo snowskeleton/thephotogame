@@ -4,8 +4,8 @@
 	const c = $derived(data.category);
 	let options = $state(data.options.map((o) => ({ ...o, key: `o${o.id}` })));
 	let n = 0;
-	const add = (kind: 'tier' | 'extra') =>
-		options.push({ id: 0, label: '', points: kind === 'tier' ? 1 : 0.5, kind, key: `n${n++}` });
+	const add = (kind: 'tier' | 'extra' | 'bonus') =>
+		options.push({ id: 0, label: '', points: kind === 'tier' ? 1 : kind === 'bonus' ? 1 : 0.5, kind, key: `n${n++}` });
 </script>
 
 <a class="muted small" href="/g/{data.game.code}/admin/categories">← Categories</a>
@@ -24,7 +24,8 @@
 		<h2 style="margin:0">Scoring</h2>
 		<p class="muted small" style="margin:0">
 			A <strong>base</strong> line is what a photo is worth; with several, the player picks one (e.g. “Color match — 2”, “Color and texture — 3”).
-			An <strong>extra</strong> is added per item, and the player says how many (e.g. “Each additional person — 0.5”).
+			An <strong>extra</strong> is added per item, with a count (e.g. “Each additional person — 0.5”).
+			A <strong>bonus</strong> is a flat add-on you tick when it applies; bonuses stack with the base line and each other (e.g. “Includes the whole family — 2”).
 		</p>
 		{#each options as o, i (o.key)}
 			<div class="opt">
@@ -34,6 +35,7 @@
 				<select name="opt_kind" bind:value={o.kind} aria-label="Kind">
 					<option value="tier">base</option>
 					<option value="extra">extra, each</option>
+					<option value="bonus">bonus, flat</option>
 				</select>
 				<button type="button" class="sm danger" onclick={() => options.splice(i, 1)} aria-label="Remove">✕</button>
 			</div>
@@ -41,6 +43,7 @@
 		<div class="row">
 			<button type="button" class="sm" onclick={() => add('tier')}>+ Base line</button>
 			<button type="button" class="sm" onclick={() => add('extra')}>+ Extra</button>
+			<button type="button" class="sm" onclick={() => add('bonus')}>+ Bonus</button>
 		</div>
 		<label>How many photos per team can score here? (empty for no limit)
 			<input name="scoring_cap" type="number" min="1" defaultValue={c.scoring_cap ?? ''} /></label>

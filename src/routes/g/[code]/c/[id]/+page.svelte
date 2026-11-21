@@ -21,7 +21,7 @@
 			{#each data.options as o}
 				<div class="spread small" style="padding:3px 0">
 					<span>{o.label}</span>
-					<strong>{o.kind === 'extra' ? '+' : ''}{pts(o.points)} pt{o.kind === 'extra' ? ' each' : ''}</strong>
+					<strong>{o.kind !== 'tier' ? '+' : ''}{pts(o.points)} pt{o.kind === 'extra' ? ' each' : o.kind === 'bonus' ? ' bonus' : ''}</strong>
 				</div>
 			{/each}
 		</div>
