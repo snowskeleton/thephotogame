@@ -424,3 +424,38 @@ describe('voted awards', () => {
 	});
 });
 void team;
+
+describe('reordering categories', () => {
+	const order = async (gameId: number) => (await sql('SELECT id FROM category WHERE game_id = ? ORDER BY sort, id', gameId)).map((r) => r.id);
+
+	it('saves a new order from a list of ids', async () => {
+		const { g, cookie, cat } = await world();
+		const b = await category(g.id);
+		const c = await category(g.id);
+		await post(`/g/${g.code}/admin/categories?/reorder`, { ids: JSON.stringify([c.id, cat.id, b.id]) }, { cookie: cookie.host });
+		expect(await order(g.id)).toEqual([c.id, cat.id, b.id]);
+	});
+	it('keeps categories that are missing from the list, after the listed ones', async () => {
+		const { g, cookie, cat } = await world();
+		const b = await category(g.id);
+		const c = await category(g.id);
+		await post(`/g/${g.code}/admin/categories?/reorder`, { ids: JSON.stringify([c.id]) }, { cookie: cookie.host });
+		expect(await order(g.id)).toEqual([c.id, cat.id, b.id]);
+	});
+	it('ignores ids from other games and junk', async () => {
+		const { g, cookie, cat } = await world();
+		const other = await world();
+		const b = await category(g.id);
+		await post(`/g/${g.code}/admin/categories?/reorder`, { ids: JSON.stringify([other.cat.id, 'x', b.id, b.id]) }, { cookie: cookie.host });
+		expect(await order(g.id)).toEqual([b.id, cat.id]);
+		expect(await order(other.g.id)).toEqual([other.cat.id]);
+		expect((await post(`/g/${g.code}/admin/categories?/reorder`, { ids: 'not json' }, { cookie: cookie.host })).status).toBeLessThan(500);
+	});
+	it('is for hosts only', async () => {
+		const { g, cookie, cat } = await world();
+		const b = await category(g.id);
+		const r = await post(`/g/${g.code}/admin/categories?/reorder`, { ids: JSON.stringify([b.id, cat.id]) }, { cookie: cookie.alice });
+		expect(r.status).toBe(403);
+		expect(await order(g.id)).toEqual([cat.id, b.id]);
+	});
+});

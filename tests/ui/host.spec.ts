@@ -164,3 +164,63 @@ test.describe('navigation robustness', () => {
 		await expect(page.getByRole('heading', { name: 'Categories' })).toBeVisible();
 	});
 });
+
+test.describe('reordering categories by dragging', () => {
+	const names = (page: import('@playwright/test').Page) => page.locator('[data-category]').evaluateAll((els) => els.map((e) => e.getAttribute('data-category')));
+
+	async function drag(page: import('@playwright/test').Page, from: string, to: string, where: 'above' | 'below') {
+		const handle = page.locator(`[data-category="${from}"] [data-handle]`);
+		const target = page.locator(`[data-category="${to}"]`);
+		const h = (await handle.boundingBox())!;
+		const t = (await target.boundingBox())!;
+		await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
+		await page.mouse.down();
+		const y = where === 'above' ? t.y + 4 : t.y + t.height - 4;
+		await page.mouse.move(h.x + h.width / 2, (h.y + y) / 2, { steps: 5 });
+		await page.mouse.move(h.x + h.width / 2, y, { steps: 10 });
+		await page.mouse.up();
+	}
+
+	test('dragging a category to the top saves the new order, and it survives a reload', async ({ page, site, world }) => {
+		const c3 = site.category(world.g.id, 'Third');
+		const c4 = site.category(world.g.id, 'Fourth');
+		await site.signIn(page, world.host.id);
+		await page.goto(`/g/${world.g.code}/admin/categories`);
+		expect(await names(page)).toEqual(['Silly hats', 'Dogs', 'Third', 'Fourth']);
+		await drag(page, 'Fourth', 'Silly hats', 'above');
+		await expect.poll(() => names(page)).toEqual(['Fourth', 'Silly hats', 'Dogs', 'Third']);
+		await expect.poll(() => site.all('SELECT name FROM category WHERE game_id = ? ORDER BY sort, id', world.g.id).map((r) => r.name)).toEqual(['Fourth', 'Silly hats', 'Dogs', 'Third']);
+		await page.reload();
+		expect(await names(page)).toEqual(['Fourth', 'Silly hats', 'Dogs', 'Third']);
+		// The board shows the same order.
+		await page.goto(`/g/${world.g.code}`);
+		await expect(page.locator('a.cell .name').first()).toHaveText('Fourth');
+		expect(c3.id).toBeGreaterThan(0);
+		expect(c4.id).toBeGreaterThan(0);
+	});
+
+	test('dragging a category down and then back up restores the order', async ({ page, site, world }) => {
+		site.category(world.g.id, 'Third');
+		await site.signIn(page, world.host.id);
+		await page.goto(`/g/${world.g.code}/admin/categories`);
+		await drag(page, 'Silly hats', 'Dogs', 'below');
+		await expect.poll(() => names(page)).toEqual(['Dogs', 'Silly hats', 'Third']);
+		await drag(page, 'Silly hats', 'Dogs', 'above');
+		await expect.poll(() => names(page)).toEqual(['Silly hats', 'Dogs', 'Third']);
+		await expect.poll(() => site.all('SELECT name FROM category WHERE game_id = ? ORDER BY sort, id', world.g.id).map((r) => r.name)).toEqual(['Silly hats', 'Dogs', 'Third']);
+	});
+
+	test('the arrow buttons still work', async ({ page, site, world }) => {
+		await site.signIn(page, world.host.id);
+		await page.goto(`/g/${world.g.code}/admin/categories`);
+		await page.locator('[data-category="Dogs"]').getByRole('button', { name: 'Move up' }).click();
+		await expect.poll(() => names(page)).toEqual(['Dogs', 'Silly hats']);
+	});
+
+	test('clicking a category name still opens it', async ({ page, site, world }) => {
+		await site.signIn(page, world.host.id);
+		await page.goto(`/g/${world.g.code}/admin/categories`);
+		await page.locator('[data-category="Dogs"] a').click();
+		await expect(page).toHaveURL(new RegExp(`/categories/${world.dogs.id}$`));
+	});
+});
