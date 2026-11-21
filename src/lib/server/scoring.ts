@@ -1,4 +1,4 @@
-import { all } from './db.ts';
+import { all, get, q } from './db.ts';
 import type { Game } from './game.ts';
 
 /** `pending` means the host hasn't assigned points yet. */
@@ -48,7 +48,7 @@ export function bingoLines(n: number, cols: number): number[][] {
 	return lines;
 }
 
-export async function scoreGame(game: Game) {
+async function computeScores(game: Game) {
 	const teams = await all<{ id: number; name: string; color: string; members: number }>(
 		`SELECT t.*, (SELECT COUNT(*) FROM member m WHERE m.team_id = t.id) AS members
 		 FROM team t WHERE t.game_id = ? ORDER BY t.id`,
@@ -187,4 +187,50 @@ export async function scoreGame(game: Game) {
 	scores.sort((a, b) => b.total - a.total || b.filled - a.filled || a.name.localeCompare(b.name));
 
 	return { teams: scores, photoScores, winners, filled, personPts, personPhotos, categoryCount: cats.length };
+}
+
+type Scores = Awaited<ReturnType<typeof computeScores>>;
+
+// Maps and Sets don't survive JSON, so they're stored as entry lists.
+const pack = (s: Scores) =>
+	JSON.stringify({
+		...s,
+		photoScores: [...s.photoScores],
+		filled: [...s.filled].map(([k, v]) => [k, [...v]]),
+		personPts: [...s.personPts],
+		personPhotos: [...s.personPhotos]
+	});
+const unpack = (json: string): Scores => {
+	const s = JSON.parse(json);
+	return {
+		...s,
+		photoScores: new Map(s.photoScores),
+		filled: new Map(s.filled.map(([k, v]: [number, number[]]) => [k, new Set(v)])),
+		personPts: new Map(s.personPts),
+		personPhotos: new Map(s.personPhotos)
+	};
+};
+
+/**
+ * A game's scores, from the stored copy while it's current. The copy is rebuilt on the first read after
+ * anything that feeds scoring changes (see db.ts), so most page views cost one small read, not a recount.
+ */
+export async function scoreGame(game: Game): Promise<Scores> {
+	// A broken or missing cache must never break a page: fall back to counting.
+	const row = await get<{ n: number; epoch: number | null; json: string | null }>(
+		`SELECT (SELECT n FROM score_epoch WHERE id = 1) AS n, c.epoch, c.json
+		 FROM (SELECT 1) LEFT JOIN score_cache c ON c.game_id = ?`,
+		game.id
+	).catch(() => undefined);
+	if (row?.json && row.epoch === row.n) {
+		try {
+			return unpack(row.json);
+		} catch {
+			// unreadable copy: rebuild below
+		}
+	}
+	const fresh = await computeScores(game);
+	// Stored under the epoch read before computing: if a write lands meanwhile, this copy is already out of date and is ignored.
+	if (row) await q('INSERT OR REPLACE INTO score_cache (game_id, epoch, json) VALUES (?, ?, ?)', game.id, row.n, pack(fresh)).run().catch(() => {});
+	return fresh;
 }
