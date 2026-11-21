@@ -289,4 +289,26 @@ describe('a key can read a log of its own API errors', () => {
 		expect((await one("SELECT kind FROM event WHERE kind = 'api_error'"))).toBeTruthy();
 	});
 });
+describe('webhooks', () => {
+	const URL_ = 'https://chat.example.com/rooms/r1/secret-key/messages';
+	it('creates, lists without the key, changes, and deletes; needs games:write to change', async () => {
+		const w = await world();
+		const t = await key(w.host.id, ALL_GAME, w.g.id);
+		const readOnly = await key(w.host.id, ['games:read'], w.g.id);
+		const path = `games/${w.g.code}/webhooks`;
+		expect((await api(path, readOnly, { method: 'POST', body: { name: 'Chat', kind: 'ember', url: URL_ } })).status).toBe(403);
+		const made = await json(await api(path, t, { method: 'POST', body: { name: 'Chat', kind: 'ember', url: URL_, events: ['photo.added'] } }));
+		expect(made).toMatchObject({ name: 'Chat', kind: 'ember', url: 'https://chat.example.com/…', events: ['photo.added'], active: true });
+		const list = await api(path, readOnly);
+		const text = await list.text();
+		expect(text).not.toContain('secret-key');
+		expect(JSON.parse(text)).toHaveLength(1);
+		expect((await api(path, t, { method: 'POST', body: { name: 'Bad', kind: 'ember', url: 'http://chat.example.com/rooms/a/b/messages' } })).status).toBe(400);
+		const patched = await json(await api(`${path}/${made.id}`, t, { method: 'PATCH', body: { active: false, events: ['photo.added', 'photo.scored'] } }));
+		expect(patched).toMatchObject({ active: false, events: ['photo.added', 'photo.scored'] });
+		expect((await api(`${path}/${made.id}`, t, { method: 'DELETE' })).status).toBe(200);
+		expect(await json(await api(path, t))).toEqual([]);
+	});
+});
+
 void post; void session;

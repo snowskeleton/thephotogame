@@ -8,6 +8,7 @@ import { browseFilter, listPhotos, onePhoto } from '#lib/server/photos.ts';
 import { browseQuery, fromGallery } from '#lib/browse.ts';
 import { scoreGame } from '#lib/server/scoring.ts';
 import { categoryIn, fileInto } from '#lib/server/uploads.ts';
+import { announce } from '#lib/server/webhooks.ts';
 
 async function ctx(event: { params: { code: string; id: string }; locals: App.Locals; url: URL }) {
 	const { game, viewer } = await enter(event.locals, event.params.code);
@@ -109,7 +110,10 @@ export const actions = {
 		if (on) await run('INSERT OR IGNORE INTO doubt (photo_id, user_id) VALUES (?, ?)', photo.id, viewer.user.id);
 		else await run('DELETE FROM doubt WHERE photo_id = ? AND user_id = ?', photo.id, viewer.user.id);
 		const over = await doubtCount(photo.id) > game.doubt_limit;
-		if (over && photo.status === 'ok') await run(`UPDATE photo SET status = 'review' WHERE id = ?`, photo.id);
+		if (over && photo.status === 'ok') {
+			await run(`UPDATE photo SET status = 'review' WHERE id = ?`, photo.id);
+			announce('photo.review', photo.id, { doubts: await doubtCount(photo.id) });
+		}
 		if (!over && photo.status === 'review') {
 			await run(`UPDATE photo SET status = 'ok' WHERE id = ?`, photo.id);
 			await run('DELETE FROM review_vote WHERE photo_id = ?', photo.id);
@@ -143,6 +147,7 @@ export const actions = {
 			await saveClaims(photo.id, photo.category_id, f);
 			// Only when the form had the "also" section, so other callers can't wipe these by omission.
 			if (f.get('also_present')) await batch(await alsoStatements(photo.id, game, photo.category_id, f));
+			announce('photo.scored', photo.id);
 		}
 		await run('UPDATE photo SET caption = ? WHERE id = ?', str(f.get('caption'), 200), photo.id);
 		return { saved: true };
@@ -168,6 +173,7 @@ export const actions = {
 		if (!viewer.isHost) return fail(403, { error: 'Admins only' });
 		const to = (await event.request.formData()).get('to') === 'disqualified' ? 'disqualified' : 'ok';
 		await run('UPDATE photo SET status = ? WHERE id = ?', to, photo.id);
+		if (to !== photo.status) announce(to === 'disqualified' ? 'photo.disqualified' : 'photo.restored', photo.id);
 		// Clearing doubts means an approved photo doesn't bounce straight back into review.
 		await run('DELETE FROM doubt WHERE photo_id = ?', photo.id);
 		await run('DELETE FROM review_vote WHERE photo_id = ?', photo.id);
@@ -196,6 +202,7 @@ export const actions = {
 		const f = await event.request.formData();
 		const raw = String(f.get('points') ?? '').trim();
 		await run('UPDATE photo SET points_override = ? WHERE id = ?', raw === '' ? null : num(raw), photo.id);
+		announce('photo.scored', photo.id);
 		return { saved: true };
 	}
 };

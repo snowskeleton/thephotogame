@@ -27,7 +27,7 @@ The Photo Game: a mobile website for family photo scavenger hunts. Product rules
 - `src/routes/` pages and form actions (`+page.server.ts`), `api/v1/[...path]/+server.ts` is the whole JSON API.
 - `src/lib/server/` all server logic: `db.ts` (async `all/get/run/insert/batch/q`), `scoring.ts`, `claims.ts`,
   `grants.ts`, `game.ts` (viewer, host checks, visibility), `perms.ts` (API keys), `auth.ts`, `uploads.ts`, `images.ts`,
-  `log.ts`, `migrate.ts`.
+  `log.ts`, `migrate.ts`, `webhooks.ts` (outgoing webhooks: Ember threads, signed JSON).
 - `src/lib/` browser code and shared helpers (`resize.ts` makes thumbnails in the browser, `browse.ts` gallery filters).
 - `migrations/NNNN_name.sql` the schema. The app applies new files itself on the first request each Worker instance
   serves and records them in `d1_migrations`. There is no migrate step.
@@ -46,6 +46,9 @@ The Photo Game: a mobile website for family photo scavenger hunts. Product rules
   the API option parser, and `docs/API.md`.
 - **A new gallery filter** goes into `browseFilter` (`photos.ts`), `browseQuery` (`browse.ts`), the gallery select and the
   slideshow loader together, or it silently resets. Keep navigation state in the URL, not component state.
+- **Webhooks:** call `announce(event, photoId)` from `webhooks.ts` after any write that should be reported (it runs after the
+  response and never throws). Add a new event to `EVENTS` and `describe()` together. A webhook's address holds a secret key:
+  show it only through `publicHook`/`maskUrl`. Hidden-game photos are withheld unless the webhook's `hidden_ok` is set.
 - **API keys** act as their minter and are re-checked against the minter's current power on every request. Do not add
   routes that change sessions, passkeys, roles or keys.
 - **Photos:** a photo hidden by the reveal rules must be refused on both its page and `/media/...`.

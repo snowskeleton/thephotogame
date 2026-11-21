@@ -6,7 +6,8 @@
 		{ href: base, label: 'Game' },
 		{ href: `${base}/categories`, label: 'Categories' },
 		{ href: `${base}/awards`, label: 'Awards' },
-		{ href: `${base}/teams`, label: 'Teams & players' }
+		{ href: `${base}/teams`, label: 'Teams & players' },
+		{ href: `${base}/webhooks`, label: 'Webhooks' }
 	]);
 </script>
 
