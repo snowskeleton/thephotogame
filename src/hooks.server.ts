@@ -4,11 +4,17 @@ import { now, run } from '#lib/server/db.ts';
 import { databaseReady } from '#lib/server/migrate.ts';
 import { logEvent } from '#lib/server/log.ts';
 
+// Browsers and crawlers ask for these guesses on every visit. Answer them before touching the database.
+const NOISE = /^\/(apple-touch-icon[\w-]*\.png|meta\.json)$/;
+
 export const handle: Handle = async ({ event, resolve }) => {
+	if (NOISE.test(event.url.pathname))
+		return new Response('Not found', { status: 404, headers: { 'cache-control': 'public, max-age=86400' } });
 	await databaseReady();
 	const user = (event.locals.user = await userFromToken(event.cookies.get(COOKIE)));
 	// "Last seen" for the admin's user list; written at most every five minutes per person.
-	if (user)
+	// The session lookup already returned last_seen_at, so a fresh one costs no extra query.
+	if (user && (user.last_seen_at ?? 0) < now() - 5 * 60_000)
 		await run(
 			'UPDATE user SET last_seen_at = ? WHERE id = ? AND COALESCE(last_seen_at, 0) < ?',
 			now(),

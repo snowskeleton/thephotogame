@@ -6,19 +6,18 @@ import { key, TYPES } from '#lib/server/images.ts';
 export const GET = async ({ params, locals, request }) => {
 	if (!locals.user) error(401, 'Sign in first');
 	const id = Number(params.id);
-	const p = await get<{ game_id: number; category_id: number | null; team_id: number; created_at: number; ext: string }>(
-		'SELECT game_id, category_id, team_id, created_at, ext FROM photo WHERE id = ?',
+	// One query for the photo, its game and the viewer's place in it: this route runs for every thumbnail.
+	const row = await get<{ game_id: number; category_id: number | null; team_id: number; created_at: number; ext: string; m_team: number | null; m_role: string | null }>(
+		`SELECT p.game_id, p.category_id, p.team_id, p.created_at, p.ext, m.team_id AS m_team, m.role AS m_role
+		 FROM photo p LEFT JOIN member m ON m.game_id = p.game_id AND m.user_id = ? AND m.status = 'active'
+		 WHERE p.id = ?`,
+		locals.user.id,
 		id
 	);
-	if (!p) error(404, 'Not found');
-	const [game, m] = await Promise.all([
-		get<Game>('SELECT * FROM game WHERE id = ?', p.game_id),
-		get<{ team_id: number | null; role: string }>(
-			"SELECT team_id, role FROM member WHERE game_id = ? AND user_id = ? AND status = 'active'",
-			p.game_id,
-			locals.user.id
-		)
-	]);
+	if (!row) error(404, 'Not found');
+	const p = row;
+	const m = row.m_role ? { team_id: row.m_team, role: row.m_role } : undefined;
+	const game = await get<Game>('SELECT * FROM game WHERE id = ?', p.game_id);
 	const isHost = !!locals.user.is_admin || m?.role === 'host';
 	if (!m && !isHost) error(403, 'Not your game');
 	// Unsorted photos stay with their team until they're filed into a category.

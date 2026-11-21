@@ -7,17 +7,17 @@ const SESSION_DAYS = 180;
 export const COOKIE = 'pg_session';
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 
-export type User = { id: number; email: string; name: string; is_admin: number; verified: boolean };
+export type User = { id: number; email: string; name: string; is_admin: number; verified: boolean; last_seen_at?: number | null };
 
 export async function userFromToken(token: string | undefined): Promise<User | null> {
 	if (!token) return null;
 	const row = await get<Omit<User, 'verified'> & { email_verified_at: number | null; expires_at: number }>(
-		`SELECT u.id, u.email, u.name, u.is_admin, u.email_verified_at, s.expires_at
+		`SELECT u.id, u.email, u.name, u.is_admin, u.email_verified_at, u.last_seen_at, s.expires_at
 		 FROM session s JOIN user u ON u.id = s.user_id WHERE s.token = ?`,
 		sha(token)
 	);
 	if (!row || row.expires_at < now()) return null;
-	return { id: row.id, email: row.email, name: row.name, is_admin: row.is_admin, verified: !!row.email_verified_at };
+	return { id: row.id, email: row.email, name: row.name, is_admin: row.is_admin, verified: !!row.email_verified_at, last_seen_at: row.last_seen_at };
 }
 
 export async function startSession(cookies: Cookies, userId: number) {
