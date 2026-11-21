@@ -28,6 +28,21 @@ export const actions = {
 		const id = (made.results[0] as { id: number }).id;
 		if (f.get('then') === 'edit') redirect(303, `/g/${game.code}/admin/categories/${id}`);
 	},
+	// The whole new order at once, from dragging: a JSON list of category ids. Ids that aren't this game's are
+	// dropped, and any category left out of the list keeps its place after the listed ones.
+	reorder: async ({ request, params, locals }) => {
+		const game = await requireHost(locals, params.code);
+		let wanted: unknown;
+		try {
+			wanted = JSON.parse(String((await request.formData()).get('ids')));
+		} catch {
+			return fail(400, { error: 'That order didn’t make sense.' });
+		}
+		const have = (await list(game.id)).map((c) => c.id);
+		const listed = Array.isArray(wanted) ? wanted.map(Number).filter((id, i, a) => have.includes(id) && a.indexOf(id) === i) : [];
+		const ids = [...listed, ...have.filter((id) => !listed.includes(id))];
+		await batch(ids.map((id, n) => q('UPDATE category SET sort = ? WHERE id = ? AND game_id = ?', n + 1, id, game.id)));
+	},
 	move: async ({ request, params, locals }) => {
 		const game = await requireHost(locals, params.code);
 		const f = await request.formData();
