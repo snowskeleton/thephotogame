@@ -1,0 +1,4 @@
+# Local copies of the Worker's dashboard variables and secrets, for `npm run dev` / `npm run preview`.
+# Copy to .dev.vars (which git ignores) and fill in.
+OWNER_EMAIL=you@example.com
+# RESEND_API_KEY=re_...

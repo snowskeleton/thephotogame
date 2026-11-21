@@ -1,0 +1,32 @@
+{
+	// Deploying: connect this repository to a Worker in the Cloudflare dashboard (Workers Builds).
+	// The database and photo bucket below are created on the first deploy (no IDs needed here), and the
+	// app applies migrations/ itself on startup. See the README for the two settings to add.
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "thephotogame",
+	"main": ".svelte-kit/cloudflare/_worker.js",
+	"compatibility_date": "2026-11-01",
+	"compatibility_flags": ["nodejs_compat"],
+	// `wrangler deploy` builds first, so the dashboard's default deploy command is all it needs.
+	"build": { "command": "npm run build", "watch_dir": "src" },
+	"assets": { "binding": "ASSETS", "directory": ".svelte-kit/cloudflare" },
+	"observability": { "enabled": true },
+	"d1_databases": [{ "binding": "DB", "database_name": "thephotogame", "migrations_dir": "migrations" }],
+	"r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "thephotogame-photos" }],
+	// Variables and secrets live in the dashboard (Worker → Settings → Variables and Secrets), and
+	// deploys leave them alone:
+	//   OWNER_EMAIL         (variable, required) your email; it becomes the site admin when you first sign in
+	//   RESEND_API_KEY      (secret) for sending email; without it, codes only appear in the Worker's logs
+	//   TIME_ZONE           (variable, optional) for grouping photos by day; default America/New_York
+	//   TURNSTILE_SITE_KEY  (variable, optional) and TURNSTILE_SECRET (secret): bot check on sign-up
+	//   PHOTOS_URL          (variable, optional) the bucket's custom domain, for CSAM scanning (README)
+	// The sender address for email is set in the app, under Site admin → Settings.
+	"keep_vars": true,
+	// Branch previews (`wrangler preview`, which Workers Builds runs for non-production branches) get their own
+	// database and photo bucket, so a preview never touches production data. Previews have no sign-up secrets:
+	// add OWNER_EMAIL etc. with `wrangler preview secret` / the preview base config if you want to sign in to one.
+	"previews": {
+		"d1_databases": [{ "binding": "DB", "database_name": "thephotogame-preview", "database_id": "d6153042-1130-4821-b003-540dd847cce7", "migrations_dir": "migrations" }],
+		"r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "thephotogame-photos-preview" }]
+	}
+}

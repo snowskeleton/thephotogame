@@ -17,7 +17,7 @@
 		options: Option[];
 		claims: { option_id: number; qty: number }[];
 		categories: { id: number; name: string }[];
-		/** Only the showrunner assigns points. */
+		/** Only the host assigns points. */
 		canScore?: boolean;
 	} = $props();
 
@@ -54,7 +54,7 @@
 		</label>
 	{/if}
 	{#if moving}
-		<p class="muted small" style="margin:0">Moving clears the photo's points. The showrunner sets them again.</p>
+		<p class="muted small" style="margin:0">Moving clears the photo's points. The host sets them again.</p>
 	{:else if canScore}
 		<ClaimFields {options} {claims} />
 	{/if}

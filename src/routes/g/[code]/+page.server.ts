@@ -7,8 +7,8 @@ import { remove } from '#lib/server/images.ts';
 import { categoryIn, fileInto, savePhotos, unsortedFor } from '#lib/server/uploads.ts';
 
 /** One of the viewer's own unsorted photos, or a failure. */
-function unsortedPhoto(f: FormData, gameId: number, userId: number) {
-	return get<{ id: number }>(
+async function unsortedPhoto(f: FormData, gameId: number, userId: number) {
+	return await get<{ id: number }>(
 		'SELECT id FROM photo WHERE id = ? AND game_id = ? AND user_id = ? AND category_id IS NULL',
 		Number(f.get('photo_id')),
 		gameId,
@@ -16,66 +16,66 @@ function unsortedPhoto(f: FormData, gameId: number, userId: number) {
 	);
 }
 
-export const load = ({ params, locals, url }) => {
-	const { game, viewer } = enter(locals, params.code, url.pathname);
-	const categories = all<{ id: number; name: string; day_label: string; top: number | null }>(
+export const load = async ({ params, locals, url }) => {
+	const { game, viewer } = await enter(locals, params.code);
+	const categories = await all<{ id: number; name: string; day_label: string; top: number | null }>(
 		`SELECT c.id, c.name, c.day_label,
 			(SELECT MAX(points) FROM score_option o WHERE o.category_id = c.id AND o.kind = 'tier') AS top
 		 FROM category c WHERE c.game_id = ? AND c.active = 1 ORDER BY c.sort, c.id`,
 		game.id
 	);
 	const mine = viewer.teamId
-		? all<{ category_id: number; n: number; cover: number }>(
+		? await all<{ category_id: number; n: number; cover: number }>(
 				`SELECT category_id, COUNT(*) AS n, MAX(id) AS cover FROM photo
 				 WHERE team_id = ? AND category_id IS NOT NULL AND status != 'disqualified' GROUP BY category_id`,
 				viewer.teamId
 			)
 		: [];
-	const others = all<{ category_id: number; color: string }>(
+	const others = await all<{ category_id: number; color: string }>(
 		`SELECT DISTINCT p.category_id, t.color FROM photo p JOIN team t ON t.id = p.team_id
 		 WHERE p.game_id = ? AND p.category_id IS NOT NULL AND p.status != 'disqualified' AND p.team_id != ?`,
 		game.id,
 		viewer.teamId ?? -1
 	);
-	const teams = all<{ id: number; name: string; color: string; members: number; names: string | null }>(
+	const teams = await all<{ id: number; name: string; color: string; members: number; names: string | null }>(
 		`SELECT t.*, COUNT(m.user_id) AS members, GROUP_CONCAT(u.name, ', ') AS names
 		 FROM team t LEFT JOIN member m ON m.team_id = t.id LEFT JOIN user u ON u.id = m.user_id
 		 WHERE t.game_id = ? GROUP BY t.id ORDER BY t.id`,
 		game.id
 	);
-	const score = scoreGame(game).teams.find((t) => t.id === viewer.teamId) ?? null;
-	return { categories, mine, others, teams, score, unsorted: unsortedFor(game.id, viewer.user.id) };
+	const score = (await scoreGame(game)).teams.find((t) => t.id === viewer.teamId) ?? null;
+	return { categories, mine, others, teams, score, unsorted: await unsortedFor(game.id, viewer.user.id) };
 };
 
 export const actions = {
 	upload: async ({ request, params, locals, url }) => {
-		const { game, viewer } = enter(locals, params.code, url.pathname);
-		return savePhotos(game, viewer, await request.formData(), null);
+		const { game, viewer } = await enter(locals, params.code);
+		return await savePhotos(game, viewer, await request.formData(), null);
 	},
 	file: async ({ request, params, locals, url }) => {
-		const { game, viewer } = enter(locals, params.code, url.pathname);
+		const { game, viewer } = await enter(locals, params.code);
 		const f = await request.formData();
-		const photo = unsortedPhoto(f, game.id, viewer.user.id);
+		const photo = await unsortedPhoto(f, game.id, viewer.user.id);
 		if (!photo) return fail(400, { error: 'That photo has already been sorted or deleted.' });
-		const category = categoryIn(game.id, f.get('category'));
+		const category = await categoryIn(game.id, f.get('category'));
 		if (!category) return fail(400, { error: 'Pick a category.' });
 		if (!game.submissions_open || !category.active) return fail(400, { error: 'Submissions are closed.' });
-		fileInto(photo.id, category.id, true);
+		await fileInto(photo.id, category.id, true);
 		return { filed: category.name };
 	},
 	discard: async ({ request, params, locals, url }) => {
-		const { game, viewer } = enter(locals, params.code, url.pathname);
-		const photo = unsortedPhoto(await request.formData(), game.id, viewer.user.id);
+		const { game, viewer } = await enter(locals, params.code);
+		const photo = await unsortedPhoto(await request.formData(), game.id, viewer.user.id);
 		if (!photo) return;
-		run('DELETE FROM photo WHERE id = ?', photo.id);
-		await remove(photo.id);
+		const gone = await get<{ id: number; ext: string }>('DELETE FROM photo WHERE id = ? RETURNING id, ext', photo.id);
+		if (gone) await remove([gone]);
 	},
 	joinTeam: async ({ request, params, locals, url }) => {
-		const { game, viewer } = enter(locals, params.code, url.pathname);
+		const { game, viewer } = await enter(locals, params.code);
 		if (game.team_mode !== 'self') return fail(403, { error: 'The showrunner is assigning teams.' });
 		if (viewer.teamId) return fail(400, { error: 'You’re already on a team. Ask the showrunner to move you.' });
 		const teamId = Number((await request.formData()).get('team'));
-		const team = get<{ id: number; n: number }>(
+		const team = await get<{ id: number; n: number }>(
 			`SELECT t.id, (SELECT COUNT(*) FROM member m WHERE m.team_id = t.id) AS n
 			 FROM team t WHERE t.id = ? AND t.game_id = ?`,
 			teamId,
@@ -83,10 +83,10 @@ export const actions = {
 		);
 		if (!team) return fail(400, { error: 'That team is gone.' });
 		if (game.max_team_size && team.n >= game.max_team_size) return fail(400, { error: 'That team is full.' });
-		run('INSERT OR REPLACE INTO member (game_id, user_id, team_id) VALUES (?, ?, ?)', game.id, viewer.user.id, team.id);
+		await run('INSERT INTO member (game_id, user_id, team_id) VALUES (?, ?, ?) ON CONFLICT(game_id, user_id) DO UPDATE SET team_id = excluded.team_id', game.id, viewer.user.id, team.id);
 	},
 	newTeam: async ({ request, params, locals, url }) => {
-		const { game, viewer } = enter(locals, params.code, url.pathname);
+		const { game, viewer } = await enter(locals, params.code);
 		if (game.team_mode !== 'self') return fail(403, { error: 'The showrunner is assigning teams.' });
 		if (viewer.teamId) return fail(400, { error: 'You’re already on a team.' });
 		const f = await request.formData();
@@ -94,7 +94,7 @@ export const actions = {
 		const color = validColor(f.get('color'));
 		if (!name) return fail(400, { error: 'Give your team a name.' });
 		if (!color) return fail(400, { error: 'Pick a color.' });
-		const id = insert('INSERT INTO team (game_id, name, color) VALUES (?, ?, ?)', game.id, name, color);
-		run('INSERT OR REPLACE INTO member (game_id, user_id, team_id) VALUES (?, ?, ?)', game.id, viewer.user.id, id);
+		const id = await insert('INSERT INTO team (game_id, name, color) VALUES (?, ?, ?)', game.id, name, color);
+		await run('INSERT INTO member (game_id, user_id, team_id) VALUES (?, ?, ?) ON CONFLICT(game_id, user_id) DO UPDATE SET team_id = excluded.team_id', game.id, viewer.user.id, id);
 	}
 };

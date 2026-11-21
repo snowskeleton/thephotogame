@@ -1,5 +1,5 @@
-import { requireAdmin } from '#lib/server/game.ts';
+import { requireHost } from '#lib/server/game.ts';
 
-export const load = ({ locals }) => {
-	requireAdmin(locals);
+export const load = async ({ locals, params }) => {
+	await requireHost(locals, params.code);
 };

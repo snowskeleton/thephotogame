@@ -27,7 +27,7 @@
 </script>
 
 <main>
-	<p class="small"><a href="/admin">‹ Admin</a></p>
+	<p class="small"><a href="/admin">‹ Site admin</a></p>
 	<h1>People</h1>
 
 	<details class="card" open={!!form?.error && !form?.report}>
@@ -35,7 +35,7 @@
 		<form method="POST" action="?/add" class="stack" style="margin-top:12px">
 			<label>Name <input name="name" defaultValue={start.name} required maxlength="40" autocomplete="off" /></label>
 			<label>Email <input name="email" type="email" defaultValue={start.email} required autocomplete="off" /></label>
-			<label class="check"><input type="checkbox" name="is_admin" /> Admin (can run every game and manage people)</label>
+			<label class="check"><input type="checkbox" name="is_admin" /> Site admin (can run every game, manage people and change settings)</label>
 			{#if data.games.length}
 				<label>
 					Put them in a game
@@ -45,12 +45,9 @@
 					</select>
 				</label>
 			{/if}
-			<label class="check">
-				<input type="checkbox" name="invite" checked={data.mailReady} disabled={!data.mailReady} /> Email them a sign-in link
-			</label>
-			{#if !data.mailReady}
-				<p class="muted small" style="margin:0">Email isn’t set up on this server, so you’ll get a link or QR code to pass on instead.</p>
-			{/if}
+			<p class="muted small" style="margin:0">
+				We email them an invite link.{#if !data.mailReady} Email isn’t set up yet, so it only goes to the server log; you can make them a sign-in link on their page instead.{/if}
+			</p>
 			{#if form?.error}
 				<p class="err">
 					{form.error}
@@ -77,15 +74,13 @@
 					</select>
 				</label>
 			{/if}
-			<label class="check">
-				<input type="checkbox" name="invite" checked={data.mailReady} disabled={!data.mailReady} /> Email each new person a sign-in link
-			</label>
+			<p class="muted small" style="margin:0">New people, and anyone new to the game you pick, get an invite email.</p>
 			{#if form?.report}
 				{@const r = form.report}
 				<div class="small">
 					<p class="ok">Added {plural(r.added.length, 'person')}{r.added.length ? `: ${r.added.join(', ')}` : ''}.</p>
 					{#if r.already.length}
-						<p>Already here{form.game ? ` (now in ${form.game})` : ''}: {r.already.join(', ')}.</p>
+						<p>Already had an account{form.game ? ` (invited to ${form.game})` : ''}: {r.already.join(', ')}.</p>
 					{/if}
 					{#if r.bad.length}<p class="err">No email found in: {r.bad.join(' · ')}</p>{/if}
 					{#if r.mailFailed.length}<p class="err">Couldn’t email: {r.mailFailed.join(', ')}</p>{/if}
@@ -106,7 +101,7 @@
 		<a class="card person" href="/admin/users/{u.id}">
 			<span class="grow">
 				<strong>{u.name}</strong>
-				{#if u.is_admin}<span class="pill">admin</span>{/if}
+				{#if u.is_admin}<span class="pill">site admin</span>{/if}
 				{#if u.id === data.me}<span class="muted small">you</span>{/if}
 				<br />
 				<span class="muted small email">{u.email}</span><br />

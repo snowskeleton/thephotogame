@@ -7,7 +7,7 @@
 	import PhotoEditor from '#lib/components/PhotoEditor.svelte';
 	let { data, form } = $props();
 	const open = $derived(data.game.submissions_open && data.category.active);
-	const canEdit = (p: { user_id: number }) => p.user_id === data.user?.id || data.isAdmin;
+	const canEdit = (p: { user_id: number }) => p.user_id === data.user?.id || data.isHost;
 </script>
 
 <a class="muted small" href="/g/{data.game.code}">← Board</a>
@@ -37,7 +37,7 @@
 		<h2 style="margin:0">Add photos here</h2>
 		<Uploader>
 			{#snippet fields()}
-				{#if data.isAdmin}<ClaimFields options={data.options} />{/if}
+				{#if data.isHost}<ClaimFields options={data.options} />{/if}
 				<label>Caption (optional) <input name="caption" maxlength="200" /></label>
 			{/snippet}
 		</Uploader>
@@ -56,7 +56,7 @@
 		{#each data.ours as p (p.id)}
 			<div class="card ourrow" style="{tv(p.color)}">
 				<div class="row" style="flex-wrap:nowrap">
-					<div class="ourthumb"><Thumb photo={p} code={data.game.code} /></div>
+					<div class="ourthumb"><Thumb photo={p} code={data.game.code} showScore={data.isHost} /></div>
 					<div class="grow">
 						<strong>{p.who}</strong>
 						{#if p.caption}<div class="small">{p.caption}</div>{/if}
@@ -73,7 +73,7 @@
 					<details>
 						<summary>Edit</summary>
 						<div class="stack" style="margin-top:10px">
-							<PhotoEditor photo={p} code={data.game.code} options={data.options} claims={p.claims} categories={data.categories} canScore={data.isAdmin} />
+							<PhotoEditor photo={p} code={data.game.code} options={data.options} claims={p.claims} categories={data.categories} canScore={data.isHost} />
 						</div>
 					</details>
 				{/if}
@@ -84,7 +84,7 @@
 {#if data.theirs.length}
 	<h2>Other teams</h2>
 	<div class="photos">
-		{#each data.theirs as p}<Thumb photo={p} code={data.game.code} />{/each}
+		{#each data.theirs as p}<Thumb photo={p} code={data.game.code} showScore={data.isHost} />{/each}
 	</div>
 {/if}
 

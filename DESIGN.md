@@ -9,13 +9,15 @@ looks through the day's photos together at night, votes, and wins prizes.
 | Topic | Decision |
 |---|---|
 | Platform | Mobile website (iPhone and Android), Jackbox-style join link |
-| Hosting | Single Docker container behind Caddy, on its own subdomain |
-| Email | Sent through the existing SMTP server |
+| Hosting | Cloudflare Workers (free plan), with D1 for data and R2 for photos |
+| Email | Sent through Resend's HTTP API (Workers can't speak SMTP) |
 | Competitors | Colored teams; a team can be one person. Every photo is credited to the person who took it |
-| Teams | Per game: the admin assigns teams, or players team up themselves. A max team size is shown; admins can exceed it and the team is flagged as oversized |
+| Roles | A **site admin** (you) runs the whole site. Each game has one or more **hosts**, who run that game only. Everyone else is a player. Hosts and players can be in any number of games |
+| Sign-up | Public: anyone can make an account and, once their email is confirmed, host games (a site admin can turn this off). Playing doesn't need a confirmed email |
+| Teams | Per game: the host assigns teams, or players team up themselves. A max team size is shown; admins can exceed it and the team is flagged as oversized |
 | Scoring | Each photo earns points from its category's scoring options, plus voted awards, pencilled-in awards and optional bingo bonuses |
 | Voting | Approval voting: vote for as many photos as you like, most votes wins |
-| Submissions | Any number per category; points are assigned by admins only. Optional per-category cap on how many photos score; admins can disqualify |
+| Submissions | Any number per category, points are assigned by hosts only. Optional per-category cap on how many photos score; admins can disqualify |
 | Visibility | Per game: photos hidden until the showrunner reveals them, or always visible |
 | Structure | Categories can carry a day label, so a game can be trip-long, daily, or mixed |
 | Media | Photos only |
@@ -23,13 +25,29 @@ looks through the day's photos together at night, votes, and wins prizes.
 
 ## Stack
 
-- **SvelteKit** (Node adapter): one process serves pages and API.
-- **SQLite** (Node's built-in driver) in a Docker volume, next to the photo
-  files. Backup = copy one folder.
-- **sharp** makes thumbnails and screen-sized copies; originals are kept.
-- **SimpleWebAuthn** for passkeys, **nodemailer** for email.
-- Configuration by environment variables: `ORIGIN`, `ADMIN_EMAIL`, `SMTP_*`,
-  `DATA_DIR`, `TZ`.
+- **SvelteKit** (Cloudflare adapter): one Worker serves pages and API.
+- **D1** (Cloudflare's SQLite) holds the data; the schema is in `migrations/`.
+  D1 is async and has no BEGIN/COMMIT, so writes that belong together go
+  through `batch()`.
+- **R2** holds the photos: the original plus a thumbnail and a screen-sized JPEG.
+  The phone makes those two copies before uploading (`src/lib/resize.ts`),
+  since Workers can't run sharp. The admin's "download all" zip is built in the
+  browser too, to stay inside a Worker's CPU limit.
+  With `PHOTOS_URL` set, the photo route fetches through the bucket's custom
+  domain instead of the binding, so photos pass Cloudflare's cache and its CSAM
+  scanner; a WAF rule lets only this Worker reach that domain.
+- **SimpleWebAuthn** for passkeys, **Resend** for email.
+- Deployed by Workers Builds from GitHub. `wrangler.jsonc` names the D1
+  database and R2 bucket without IDs, so the first deploy creates them and
+  later deploys reuse them. The app applies `migrations/` itself on the first
+  request each Worker instance serves (`src/lib/server/migrate.ts`), keeping
+  wrangler's `d1_migrations` table, so there's no migrate step.
+- Configuration lives in the dashboard, which deploys leave alone
+  (`keep_vars`): `OWNER_EMAIL` (required), `TIME_ZONE`, `TURNSTILE_SITE_KEY`,
+  `PHOTOS_URL`, and the `RESEND_API_KEY` and `TURNSTILE_SECRET` secrets.
+  Settings a site admin changes in the app (sender address, public sign-ups,
+  limits) live in the `setting` table. Without a sender address, email goes
+  from Resend's test sender, which only reaches the Resend account's owner.
 
 ## Sign-in
 
@@ -45,8 +63,41 @@ Goal: it just works, and everyone has a unique email on file.
    (or it fails and you choose so) a six-digit code is emailed instead. A QR
    code shown by a device that is already signed in also works.
 
-5. After signing in with a code, a link or a fresh join, the next page offers
-   to save a passkey on that device ("Not now" stops it asking for 30 days).
+5. After signing in with a code, an invite, a link or a fresh join, anyone
+   without a passkey is offered one. "Not now" carries on, and they're asked
+   again at their next sign-in until they save one.
+6. A new email on the sign-in page (with public sign-ups on) asks for a name,
+   passes the Turnstile bot check, and gets a code. The account is only made
+   when the code is entered, so it starts with a confirmed email.
+
+An email counts as **confirmed** after entering an emailed code or accepting
+an emailed invite. Hosting a game needs it. Site admin rights also only come
+with a confirmed email, and only for `OWNER_EMAIL`. Without it set, nobody
+becomes site admin and the site shows a setup notice.
+
+## Hosts and invites
+
+Whoever creates a game is its host. On the game's Teams page a host invites
+people by email, resends invites, makes other players hosts (a game always
+keeps at least one), and removes players (hosts have to be made players
+first). An invited person shows as *invited* until they accept: the email's
+link opens a page with an Accept button (a button, so link scanners can't use
+it up), which signs them in, confirms their email, adds them to the game and
+offers a passkey. Opening the game's join link also accepts. Nobody but a
+site admin can make a sign-in link for someone else, so a host can't sign in
+as a player who has an account elsewhere on the site.
+
+A host can send 20 invite emails per 24 hours (resends count; site admins have
+no cap), so a stranger's account can't spend the site's email allowance. The
+join link and QR code have no limit.
+
+Join codes are 10 random characters from 31 that can't be confused (no
+0/O or 1/I/L), so they can't be guessed; typing ignores case, spaces and
+dashes. Hosts can't pick their own code, but can make a new one if a link gets
+out, which stops the old code and link working.
+
+Limits a site admin sets: games one person can create (default 3) and photos
+per game (default 1000). Site admins and their games aren't limited.
 
 Typed-in fields use `defaultValue={...}`, not `value={...}`. After hydration
 Svelte writes a `value={...}` back into the field whenever anything in the
@@ -62,15 +113,19 @@ metallics (gold, silver, bronze, ...) and shimmer gradients (holographic,
 sunset, galaxy, ...). The picker groups them into palettes and is the same
 when creating and editing a team. `tv(color)` produces the CSS variables.
 
-## People (admin)
+## People and settings (site admin)
 
-Admin → People lists everyone with search and filters (admins, not signed in
-yet). Admins can add one person or paste a list, make someone an admin, put
-them in a game, and optionally email a one-time sign-in link (good for 7
-days). Each person's page edits name, email and admin rights, games and
-teams, shows a sign-in link / QR, emails a link, signs them out everywhere,
-removes passkeys, or deletes them. Admins can't remove their own admin rights
-or delete themselves, so there is always one admin.
+Site admin → People lists everyone with search and filters. Site admins can
+add one person or paste a list, make someone a site admin, and invite them to
+a game; everyone added gets an invite email. Each person's page edits name,
+email and site admin rights, games and teams, shows a sign-in link / QR (the
+fallback when email fails), emails an invite, signs them out everywhere,
+removes passkeys, or deletes them. Site admins can't remove their own rights
+or delete themselves, so there is always one.
+
+Site admin → Settings shows whether email is set up (with the steps if not, and
+a test button), the public sign-up switch, the limits, and the Turnstile
+status. Until email is set up, site admins see a banner on every page.
 
 ## Categories and scoring
 
@@ -85,8 +140,8 @@ item". So a category has a list of **scoring options**:
 
 Points can be fractional (0.5).
 
-Players don't score their own photos. A new photo is **awaiting points** until an
-admin picks its tier and extras (or types a total) on the photo page. Photos
+Players don't score their own photos. A new photo is **awaiting points** until a
+host picks its tier and extras (or types a total) on the photo page. Photos
 that already had a player's claim keep it, but players can no longer change it.
 Moving a photo to another category clears its points. Checks:
 
@@ -133,7 +188,7 @@ Filing one sets its time to "now", so in hidden mode a photo filed after a
 reveal waits for the next reveal.
 
 A category page also uploads (straight into that category, with the caption) and stays on the page. Its list of the team's photos has an editor for
-the photographer and admins: caption, move to another category (which clears its points) and delete; admins also set the points. The page sends one photo per
+the photographer and admins: caption, move to another category (which clears its points) and delete; hosts also set the points. The page sends one photo per
 request with a progress bar, so a big batch doesn't fail as a whole.
 
 ## Visibility

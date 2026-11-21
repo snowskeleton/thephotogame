@@ -35,14 +35,23 @@
 			<strong>
 				{#if p.status === 'disqualified'}Disqualified
 				{:else if p.status === 'review'}Under review — no points for now
-				{:else if data.score.pending}Awaiting points from the showrunner
+				{:else if data.score.pending}Awaiting points from the host
 				{:else if !data.score.counted}Over this category's scoring limit
 				{:else}Points{/if}
 			</strong>
 			<strong>{pts(data.score.points)}{#if !data.score.counted && p.status !== 'disqualified'} <span class="muted small">(claims {pts(data.score.claimed)})</span>{/if}</strong>
 		</div>
 		{#each data.grants as g}
-			<div class="spread small"><span>🏅 {g.title}</span><span>+{pts(g.points)}</span></div>
+			<div class="spread small"><span>🏅 {g.team}: {g.title}</span>
+				<span class="row" style="gap:8px;flex-wrap:nowrap">
+					{g.points >= 0 ? '+' : ''}{pts(g.points)}
+					{#if data.isHost}
+						<form method="POST" action="?/removeCredit" use:enhance onsubmit={(e) => { if (!confirm(`Remove ${g.team}'s points from this photo?`)) e.preventDefault(); }}>
+							<input type="hidden" name="id" value={g.id} />
+							<button class="sm danger" aria-label="Remove these points">✕</button>
+						</form>
+					{/if}
+				</span></div>
 		{/each}
 	</div>
 </div>
@@ -68,16 +77,16 @@
 	</form>
 {/if}
 
-{#if data.mine || data.isAdmin}
+{#if data.mine || data.isHost}
 	<details class="card">
 		<summary>Edit photo</summary>
 		<div class="stack" style="margin-top:12px">
-			<PhotoEditor photo={p} code={data.game.code} options={data.options} claims={data.claims} categories={data.categories} canScore={data.isAdmin} />
+			<PhotoEditor photo={p} code={data.game.code} options={data.options} claims={data.claims} categories={data.categories} canScore={data.isHost} />
 		</div>
 	</details>
 {/if}
 
-{#if data.isAdmin}
+{#if data.isHost}
 	<div class="card stack">
 		<h2 style="margin:0">Showrunner</h2>
 		<form method="POST" action="?/settle" class="row" use:enhance>
@@ -89,6 +98,22 @@
 				<input name="points" inputmode="decimal" defaultValue={data.override ?? ''} placeholder={pts(data.score.claimed)} /></label>
 			<button>Save</button>
 		</form>
+		{#if data.otherTeams.length}
+			<form method="POST" action="?/give" class="stack" use:enhance={() => async ({ update, formElement }) => { await update(); formElement.reset(); }}>
+				<strong>Give other teams points for this photo</strong>
+				<fieldset class="stack" style="border:0;padding:0;margin:0;gap:4px">
+					<legend class="small muted" style="padding:0">Teams (pick any number)</legend>
+					{#each data.otherTeams as t}
+						<label class="check"><input type="checkbox" name="team" value={t.id} /> <span class="grow">{t.name}</span></label>
+					{/each}
+				</fieldset>
+				<label>Points each (negative takes points away) <input name="points" inputmode="decimal" value="1" /></label>
+				<label>Reason <input name="title" required maxlength="80" value="Also in the photo" /></label>
+				{#if form?.giveError}<p class="err small" style="margin:0">{form.giveError}</p>{/if}
+				{#if form?.gave}<p class="ok small" style="margin:0">Points given.</p>{/if}
+				<button>Give points</button>
+			</form>
+		{/if}
 		<a class="btn" href="{base}/admin/awards?photo={p.id}#pencil">🏅 Pencil in an award for this photo</a>
 	</div>
 {/if}

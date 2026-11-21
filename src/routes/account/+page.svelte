@@ -38,6 +38,13 @@
 		<button>Save name</button>
 	</form>
 
+	{#if data.canKeys}
+		<a class="card spread" href="/account/keys" style="text-decoration:none">
+			<span><strong>API keys</strong><br /><span class="muted small">Let a script or assistant act as you, with limited permissions.</span></span>
+			<span aria-hidden="true">›</span>
+		</a>
+	{/if}
+
 	<div class="card stack">
 		<h2>Passkey</h2>
 		<p class="muted small">Sign in with Face ID, fingerprint or your screen lock instead of an email code.</p>

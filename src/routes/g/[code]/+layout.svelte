@@ -8,8 +8,8 @@
 		{ href: `${base}/gallery`, icon: '🖼️', label: 'Gallery', on: /\/(gallery|p|show)(\/|$)/.test(page.url.pathname.slice(base.length)) },
 		{ href: `${base}/vote`, icon: '🗳️', label: 'Vote', on: page.url.pathname.startsWith(`${base}/vote`) },
 		{ href: `${base}/scores`, icon: '🏆', label: 'Scores', on: page.url.pathname.startsWith(`${base}/scores`) },
-		...(data.isAdmin
-			? [{ href: `${base}/admin`, icon: '🛠️', label: 'Admin', on: page.url.pathname.startsWith(`${base}/admin`) }]
+		...(data.isHost
+			? [{ href: `${base}/admin`, icon: '🛠️', label: 'Host', on: page.url.pathname.startsWith(`${base}/admin`) }]
 			: [])
 	]);
 </script>

@@ -17,7 +17,7 @@
 		<label>Rules and details <textarea name="rules">{c.rules}</textarea></label>
 		<label>Other notes <textarea name="notes" style="min-height:56px">{c.notes}</textarea></label>
 		<label>Day or group label (optional) <input name="day_label" defaultValue={c.day_label} maxlength="40" placeholder="e.g. Day 2" /></label>
-		<label class="check"><input type="checkbox" name="active" checked={!!c.active} /> Show on the board</label>
+		<label class="check"><input type="checkbox" name="active" defaultChecked={!!c.active} /> Show on the board</label>
 	</div>
 
 	<div class="card stack">

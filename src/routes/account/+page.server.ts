@@ -1,13 +1,16 @@
 import { fail, redirect } from '@sveltejs/kit';
-import QRCode from 'qrcode';
+import { qrDataUrl } from '#lib/server/qr.ts';
 import { makeHandoff } from '#lib/server/auth.ts';
-import { all, run } from '#lib/server/db.ts';
+import { all, get, run } from '#lib/server/db.ts';
 import { str } from '#lib/server/game.ts';
 
-export const load = ({ locals }) => {
+export const load = async ({ locals }) => {
 	if (!locals.user) redirect(303, '/login?next=/account');
 	return {
-		passkeys: all<{ id: string; created_at: number }>(
+		canKeys:
+			!!locals.user.is_admin ||
+			!!(await get("SELECT 1 FROM member WHERE user_id = ? AND role = 'host' AND status = 'active' LIMIT 1", locals.user.id)),
+		passkeys: await all<{ id: string; created_at: number }>(
 			'SELECT id, created_at FROM passkey WHERE user_id = ? ORDER BY created_at',
 			locals.user.id
 		)
@@ -19,16 +22,16 @@ export const actions = {
 		if (!locals.user) redirect(303, '/login');
 		const name = str((await request.formData()).get('name'), 40);
 		if (!name) return fail(400, { error: 'Name can’t be empty.' });
-		run('UPDATE user SET name = ? WHERE id = ?', name, locals.user.id);
+		await run('UPDATE user SET name = ? WHERE id = ?', name, locals.user.id);
 		return { saved: true };
 	},
 	qr: async ({ locals, url }) => {
 		if (!locals.user) redirect(303, '/login');
-		const link = `${url.origin}/link/${makeHandoff(locals.user.id, 10)}`;
-		return { qr: await QRCode.toDataURL(link, { margin: 2, width: 320 }), link };
+		const link = `${url.origin}/link/${await makeHandoff(locals.user.id, 10)}`;
+		return { qr: await qrDataUrl(link), link };
 	},
 	forget: async ({ request, locals }) => {
 		if (!locals.user) redirect(303, '/login');
-		run('DELETE FROM passkey WHERE id = ? AND user_id = ?', String((await request.formData()).get('id')), locals.user.id);
+		await run('DELETE FROM passkey WHERE id = ? AND user_id = ?', String((await request.formData()).get('id')), locals.user.id);
 	}
 };

@@ -5,8 +5,9 @@ import {
 	verifyAuthenticationResponse,
 	verifyRegistrationResponse
 } from '@simplewebauthn/server';
+import { isoBase64URL } from '@simplewebauthn/server/helpers';
 import { all, get, now, run } from '#lib/server/db.ts';
-import { cleanEmail, PASSKEY_SKIP, startSession } from '#lib/server/auth.ts';
+import { cleanEmail, startSession } from '#lib/server/auth.ts';
 
 const CH = 'pg_challenge';
 
@@ -25,7 +26,7 @@ export const POST = async ({ params, request, cookies, locals, url }) => {
 	switch (params.step) {
 		case 'register-options': {
 			if (!locals.user) error(401, 'Sign in first');
-			const existing = all<{ id: string }>('SELECT id FROM passkey WHERE user_id = ?', locals.user.id);
+			const existing = await all<{ id: string }>('SELECT id FROM passkey WHERE user_id = ?', locals.user.id);
 			const options = await generateRegistrationOptions({
 				rpName: 'The Photo Game',
 				rpID,
@@ -50,16 +51,15 @@ export const POST = async ({ params, request, cookies, locals, url }) => {
 			}).catch(() => null);
 			if (!result?.verified || !result.registrationInfo) error(400, 'Could not save that passkey.');
 			const c = result.registrationInfo.credential;
-			run(
+			await run(
 				'INSERT OR REPLACE INTO passkey (id, user_id, public_key, counter, transports, created_at) VALUES (?, ?, ?, ?, ?, ?)',
 				c.id,
 				locals.user.id,
-				Buffer.from(c.publicKey),
+				isoBase64URL.fromBuffer(c.publicKey),
 				c.counter,
 				JSON.stringify(c.transports ?? []),
 				now()
 			);
-			cookies.set(PASSKEY_SKIP, '1', { path: '/', httpOnly: true, sameSite: 'lax', maxAge: 365 * 86400 });
 			return json({ ok: true });
 		}
 		case 'login-options': {
@@ -67,7 +67,7 @@ export const POST = async ({ params, request, cookies, locals, url }) => {
 			const body = await request.json().catch(() => ({}));
 			const email = cleanEmail(body?.email);
 			const keys = email
-				? all<{ id: string; transports: string }>(
+				? await all<{ id: string; transports: string }>(
 						'SELECT k.id, k.transports FROM passkey k JOIN user u ON u.id = k.user_id WHERE u.email = ?',
 						email
 					)
@@ -83,7 +83,7 @@ export const POST = async ({ params, request, cookies, locals, url }) => {
 		}
 		case 'login-verify': {
 			const response = await request.json();
-			const pk = get<{ id: string; user_id: number; public_key: Uint8Array; counter: number; transports: string }>(
+			const pk = await get<{ id: string; user_id: number; public_key: string; counter: number; transports: string }>(
 				'SELECT * FROM passkey WHERE id = ?',
 				String(response?.id ?? '')
 			);
@@ -96,15 +96,14 @@ export const POST = async ({ params, request, cookies, locals, url }) => {
 				requireUserVerification: false,
 				credential: {
 					id: pk.id,
-					publicKey: new Uint8Array(pk.public_key),
+					publicKey: isoBase64URL.toBuffer(pk.public_key),
 					counter: pk.counter,
 					transports: JSON.parse(pk.transports || '[]')
 				}
 			}).catch(() => null);
 			if (!result?.verified) error(400, 'That passkey didn’t work. Use an email code instead.');
-			run('UPDATE passkey SET counter = ? WHERE id = ?', result.authenticationInfo.newCounter, pk.id);
-			startSession(cookies, pk.user_id);
-			cookies.set(PASSKEY_SKIP, '1', { path: '/', httpOnly: true, sameSite: 'lax', maxAge: 365 * 86400 });
+			await run('UPDATE passkey SET counter = ? WHERE id = ?', result.authenticationInfo.newCounter, pk.id);
+			await startSession(cookies, pk.user_id);
 			return json({ ok: true });
 		}
 	}

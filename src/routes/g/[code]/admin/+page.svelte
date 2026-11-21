@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import CopyLink from '#lib/components/CopyLink.svelte';
+	import DownloadAll from '#lib/components/DownloadAll.svelte';
 	import { enhance } from '$app/forms';
 	import { plural } from '#lib/format.ts';
 	let { data, form } = $props();
@@ -31,11 +33,15 @@
 	<img src={data.qr} alt="Join QR code" style="width:200px;border-radius:12px;margin:0 auto" />
 	<CopyLink value={data.link} label="Join link" shareTitle={g.name} shareText={`Join “${g.name}” on The Photo Game`} />
 	<CopyLink value={g.code} label="Game code" shareTitle={g.name} />
+	{#if page.url.searchParams.has('newcode')}<p class="ok">New code made. The old code and link no longer work.</p>{/if}
+	<form method="POST" action="?/newCode" onsubmit={(e) => { if (!confirm('Make a new code? The current join link, QR code and code will stop working.')) e.preventDefault(); }}>
+		<button class="sm">Make a new code</button>
+	</form>
+	<p class="muted small" style="margin:0">Anyone with the code or link can join, so share it like an invite. If it got out, make a new one.</p>
 </div>
 
 <form method="POST" action="?/save" class="card stack" use:enhance>
 	<label>Name <input name="name" defaultValue={g.name} required maxlength="80" /></label>
-	<label>Join code <input name="code" defaultValue={g.code} required maxlength="20" autocapitalize="characters" /></label>
 
 	<label>Who can see photos?
 		<select name="visibility">
@@ -43,7 +49,7 @@
 			<option value="open" selected={g.visibility === 'open'}>Everyone sees everything right away</option>
 		</select>
 	</label>
-	<label class="check"><input type="checkbox" name="submissions_open" checked={!!g.submissions_open} /> Submissions are open</label>
+	<label class="check"><input type="checkbox" name="submissions_open" defaultChecked={!!g.submissions_open} /> Submissions are open</label>
 
 	<hr />
 	<label>Teams
@@ -82,7 +88,7 @@
 <div class="card stack">
 	<h2 style="margin:0">Keep the photos</h2>
 	<p class="muted small" style="margin:0">A zip of all {plural(data.stats.photos, 'original photo')}, in a folder per category.</p>
-	<a class="btn" href="/g/{g.code}/admin/download" download>⬇ Download all</a>
+	<DownloadAll code={g.code} />
 </div>
 
 <details class="card">

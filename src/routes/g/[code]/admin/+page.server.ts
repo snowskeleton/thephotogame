@@ -1,39 +1,34 @@
 import { fail, redirect } from '@sveltejs/kit';
-import QRCode from 'qrcode';
+import { qrDataUrl } from '#lib/server/qr.ts';
 import { get, now, run } from '#lib/server/db.ts';
-import { gameByCode, intOrNull, num, requireAdmin, str } from '#lib/server/game.ts';
+import { cleanCode, gameByCode, intOrNull, num, randomCode, requireHost, str } from '#lib/server/game.ts';
 import { remove } from '#lib/server/images.ts';
 import { all } from '#lib/server/db.ts';
 
 export const load = async ({ params, url }) => {
-	const game = gameByCode(params.code);
+	const game = await gameByCode(params.code);
 	const link = `${url.origin}/join/${game.code}`;
 	return {
 		link,
-		qr: await QRCode.toDataURL(link, { margin: 2, width: 320 }),
-		stats: get<{ photos: number; hidden: number }>(
+		qr: await qrDataUrl(link),
+		stats: (await get<{ photos: number; hidden: number }>(
 			`SELECT COUNT(*) AS photos, COALESCE(SUM(created_at > ?), 0) AS hidden FROM photo WHERE game_id = ? AND category_id IS NOT NULL`,
 			game.revealed_at,
 			game.id
-		)!
+		))!
 	};
 };
 
 export const actions = {
 	save: async ({ request, params, locals }) => {
-		requireAdmin(locals);
-		const game = gameByCode(params.code);
+		const game = await requireHost(locals, params.code);
 		const f = await request.formData();
 		const name = str(f.get('name'), 80);
-		const code = str(f.get('code'), 20).toUpperCase().replace(/[^A-Z0-9-]/g, '');
-		if (!name || !code) return fail(400, { error: 'The game needs a name and a code.' });
-		if (get('SELECT 1 FROM game WHERE code = ? AND id != ?', code, game.id))
-			return fail(400, { error: 'Another game already uses that code.' });
-		run(
-			`UPDATE game SET name = ?, code = ?, visibility = ?, team_mode = ?, max_team_size = ?, submissions_open = ?,
+		if (!name) return fail(400, { error: 'The game needs a name.' });
+		await run(
+			`UPDATE game SET name = ?, visibility = ?, team_mode = ?, max_team_size = ?, submissions_open = ?,
 				doubt_limit = ?, bingo = ?, bingo_cols = ?, bingo_line_points = ?, bingo_board_points = ? WHERE id = ?`,
 			name,
-			code,
 			f.get('visibility') === 'open' ? 'open' : 'hidden',
 			f.get('team_mode') === 'self' ? 'self' : 'admin',
 			intOrNull(f.get('max_team_size')),
@@ -45,25 +40,30 @@ export const actions = {
 			num(f.get('bingo_board_points')),
 			game.id
 		);
-		if (code !== game.code) redirect(303, `/g/${code}/admin`);
 		return { saved: true };
 	},
+	// A fresh code and join link, for when the old one got out. Old links stop working.
+	newCode: async ({ params, locals }) => {
+		const game = await requireHost(locals, params.code);
+		const code = await randomCode();
+		await run('UPDATE game SET code = ? WHERE id = ?', code, game.id);
+		redirect(303, `/g/${code}/admin?newcode=1`);
+	},
 	reveal: async ({ params, locals }) => {
-		requireAdmin(locals);
-		run('UPDATE game SET revealed_at = ? WHERE id = ?', now(), gameByCode(params.code).id);
+		await requireHost(locals, params.code);
+		await run('UPDATE game SET revealed_at = ? WHERE id = ?', now(), (await gameByCode(params.code)).id);
 	},
 	unreveal: async ({ params, locals }) => {
-		requireAdmin(locals);
-		run('UPDATE game SET revealed_at = 0 WHERE id = ?', gameByCode(params.code).id);
+		await requireHost(locals, params.code);
+		await run('UPDATE game SET revealed_at = 0 WHERE id = ?', (await gameByCode(params.code)).id);
 	},
 	deleteGame: async ({ request, params, locals }) => {
-		requireAdmin(locals);
-		const game = gameByCode(params.code);
-		if (str((await request.formData()).get('confirm')).toUpperCase() !== game.code)
+		const game = await requireHost(locals, params.code);
+		if (cleanCode((await request.formData()).get('confirm')) !== game.code)
 			return fail(400, { error: 'Type the game code to confirm.' });
-		const ids = all<{ id: number }>('SELECT id FROM photo WHERE game_id = ?', game.id);
-		run('DELETE FROM game WHERE id = ?', game.id);
-		for (const p of ids) await remove(p.id);
-		redirect(303, '/admin');
+		const ids = await all<{ id: number; ext: string }>('SELECT id, ext FROM photo WHERE game_id = ?', game.id);
+		await run('DELETE FROM game WHERE id = ?', game.id);
+		await remove(ids);
+		redirect(303, '/');
 	}
 };
