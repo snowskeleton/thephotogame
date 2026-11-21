@@ -1,11 +1,12 @@
 import { batch, get, now, q } from './db.ts';
 import { num, str, type Game } from './game.ts';
 
-/** Gives a team points straight from the host, optionally tied to photos (they show on the photo's page). */
-export async function giveTeamPoints(game: Game, f: FormData, photoIds: number[] = []) {
+/** Gives a team points for a photo (e.g. someone from another team is in it). The points show on the photo's page and stop counting if the photo is disqualified. */
+export async function giveTeamPoints(game: Game, f: FormData, photoIds: number[]) {
 	const teamId = Number(f.get('team'));
 	const title = str(f.get('title'), 80);
 	const points = num(f.get('points'));
+	if (!photoIds.length) return 'Points have to come from a photo.';
 	if (!title) return 'Give it a short reason.';
 	if (!points) return 'Enter how many points.';
 	if (!(await get('SELECT 1 FROM team WHERE id = ? AND game_id = ?', teamId, game.id))) return 'Choose a team.';

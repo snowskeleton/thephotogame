@@ -143,7 +143,9 @@ export async function scoreGame(game: Game) {
 	}
 
 	const grants = await all<{ team_id: number; user_id: number | null; points: number }>(
-		'SELECT team_id, user_id, points FROM grant_award WHERE game_id = ?',
+		`SELECT team_id, user_id, points FROM grant_award g WHERE game_id = ?
+		 AND (NOT EXISTS (SELECT 1 FROM grant_photo gp WHERE gp.grant_id = g.id)
+			OR EXISTS (SELECT 1 FROM grant_photo gp JOIN photo p ON p.id = gp.photo_id WHERE gp.grant_id = g.id AND p.status = 'ok'))`,
 		game.id
 	);
 	const teamGrantPts = new Map<number, number>();

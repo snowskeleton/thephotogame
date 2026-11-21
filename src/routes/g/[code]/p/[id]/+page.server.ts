@@ -46,8 +46,9 @@ export const load = async (event) => {
 			mine: (await get<{ agree: number }>('SELECT agree FROM review_vote WHERE photo_id = ? AND user_id = ?', photo.id, viewer.user.id))
 				?.agree ?? null
 		},
-		grants: await all<{ title: string; points: number }>(
-			`SELECT g.title, g.points FROM grant_photo gp JOIN grant_award g ON g.id = gp.grant_id WHERE gp.photo_id = ?`,
+		grants: await all<{ title: string; points: number; team: string }>(
+			`SELECT g.title, g.points, t.name AS team FROM grant_photo gp JOIN grant_award g ON g.id = gp.grant_id
+			 JOIN team t ON t.id = g.team_id WHERE gp.photo_id = ?`,
 			photo.id
 		),
 		categories: await all<{ id: number; name: string }>(
@@ -109,6 +110,12 @@ export const actions = {
 	delete: async (event) => {
 		const { game, viewer, photo, mine } = await ctx(event);
 		if (!mine && !viewer.isHost) return fail(403, { error: 'Only the photographer can delete this.' });
+		// A credit that came from this photo goes with it, instead of turning into free-floating points.
+		await run(
+			`DELETE FROM grant_award WHERE id IN (SELECT grant_id FROM grant_photo WHERE photo_id = ?1)
+			 AND NOT EXISTS (SELECT 1 FROM grant_photo gp WHERE gp.grant_id = grant_award.id AND gp.photo_id != ?1)`,
+			photo.id
+		);
 		const gone = await get<{ id: number; ext: string }>('DELETE FROM photo WHERE id = ? RETURNING id, ext', photo.id);
 		if (gone) await remove([gone]);
 		redirect(303, `/g/${game.code}/c/${photo.category_id}`);

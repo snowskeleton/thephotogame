@@ -42,7 +42,7 @@
 			<strong>{pts(data.score.points)}{#if !data.score.counted && p.status !== 'disqualified'} <span class="muted small">(claims {pts(data.score.claimed)})</span>{/if}</strong>
 		</div>
 		{#each data.grants as g}
-			<div class="spread small"><span>🏅 {g.title}</span><span>+{pts(g.points)}</span></div>
+			<div class="spread small"><span>🏅 {g.team}: {g.title}</span><span>+{pts(g.points)}</span></div>
 		{/each}
 	</div>
 </div>
