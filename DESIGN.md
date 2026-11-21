@@ -153,6 +153,10 @@ Moving a photo to another category clears its points. Checks:
   to another category, disqualify or delete it.
 - **Cap**: a category can limit how many photos per team score (the best ones
   count). All photos stay eligible for votes.
+- **Point ceiling**: a category can also cap the points a team counts there
+  (off by default). Photos are taken best-first, and one that would push the
+  team past the ceiling doesn't count. It still shows its points and can win
+  votes.
 
 ## Awards
 

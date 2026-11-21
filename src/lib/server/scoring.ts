@@ -54,8 +54,8 @@ export async function scoreGame(game: Game) {
 		 FROM team t WHERE t.game_id = ? ORDER BY t.id`,
 		game.id
 	);
-	const cats = await all<{ id: number; scoring_cap: number | null }>(
-		'SELECT id, scoring_cap FROM category WHERE game_id = ? AND active = 1 ORDER BY sort, id',
+	const cats = await all<{ id: number; scoring_cap: number | null; max_points: number | null }>(
+		'SELECT id, scoring_cap, max_points FROM category WHERE game_id = ? AND active = 1 ORDER BY sort, id',
 		game.id
 	);
 	const photos = await all<{
@@ -77,6 +77,7 @@ export async function scoreGame(game: Game) {
 	);
 
 	const capOf = new Map(cats.map((c) => [c.id, c.scoring_cap]));
+	const maxOf = new Map(cats.map((c) => [c.id, c.max_points]));
 	const photoScores = new Map<number, PhotoScore>();
 	const groups = new Map<string, typeof photos>();
 	for (const p of photos) {
@@ -99,10 +100,18 @@ export async function scoreGame(game: Game) {
 	}
 	for (const list of groups.values()) {
 		const cap = capOf.get(list[0].category_id);
+		const max = maxOf.get(list[0].category_id);
 		list.sort((a, b) => photoScores.get(b.id)!.claimed - photoScores.get(a.id)!.claimed || a.id - b.id);
-		list.forEach((p, i) => {
+		// Best photos first. A photo that would push the team past the category's point ceiling doesn't count
+		// (a smaller one further down can still fit).
+		let counted = 0;
+		let sum = 0;
+		list.forEach((p) => {
 			const s = photoScores.get(p.id)!;
-			if (cap && i >= cap) return;
+			if (cap && counted >= cap) return;
+			if (max && sum + s.claimed > max + 1e-9) return;
+			counted++;
+			sum += s.claimed;
 			s.counted = true;
 			s.points = s.claimed;
 			teamPhotoPts.set(p.team_id, (teamPhotoPts.get(p.team_id) ?? 0) + s.points);

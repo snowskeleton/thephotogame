@@ -136,6 +136,13 @@ export function intOrNull(v: unknown): number | null {
 	const n = Math.floor(Number(s));
 	return Number.isFinite(n) && n > 0 ? n : null;
 }
+/** A positive decimal, or null for blank/invalid (used for optional limits). */
+export function positiveOrNull(v: unknown): number | null {
+	const s = String(v ?? '').trim();
+	if (!s) return null;
+	const n = Number(s);
+	return Number.isFinite(n) && n > 0 ? n : null;
+}
 export function str(v: unknown, max = 2000): string {
 	return String(v ?? '').trim().slice(0, max);
 }

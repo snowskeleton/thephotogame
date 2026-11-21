@@ -2,7 +2,7 @@ import { isHttpError, json, type RequestEvent } from '@sveltejs/kit';
 import { cleanEmail, createUser, findUserByEmail, invitesLeft, INVITES_PER_DAY, sendInvite } from '#lib/server/auth.ts';
 import { validColor } from '#lib/colors.ts';
 import { all, batch, get, insert, now, q, run } from '#lib/server/db.ts';
-import { createGame, gameByCode, intOrNull, num, str, type Game } from '#lib/server/game.ts';
+import { createGame, gameByCode, intOrNull, num, positiveOrNull, str, type Game } from '#lib/server/game.ts';
 import { remove } from '#lib/server/images.ts';
 import { optionsFor } from '#lib/server/claims.ts';
 import { actorFromToken, type Actor, type Scope } from '#lib/server/perms.ts';
@@ -43,8 +43,8 @@ const gameJson = (g: Game) => ({
 });
 
 async function categories(gameId: number) {
-	const rows = await all<{ id: number; name: string; rules: string; notes: string; day_label: string; scoring_cap: number | null; sort: number; active: number }>(
-		'SELECT id, name, rules, notes, day_label, scoring_cap, sort, active FROM category WHERE game_id = ? ORDER BY sort, id',
+	const rows = await all<{ id: number; name: string; rules: string; notes: string; day_label: string; scoring_cap: number | null; max_points: number | null; sort: number; active: number }>(
+		'SELECT id, name, rules, notes, day_label, scoring_cap, max_points, sort, active FROM category WHERE game_id = ? ORDER BY sort, id',
 		gameId
 	);
 	return Promise.all(rows.map(async (c) => ({ ...c, active: !!c.active, options: await optionsFor(c.id) })));
@@ -174,7 +174,7 @@ const routes: Route[] = [
 	} },
 	{ method: 'PATCH', path: 'games/:code/categories/:id', scope: 'games:write', game: true, run: async (c) => {
 		const g = await theGame(c);
-		const cat = await findIn<{ id: number; name: string; rules: string; notes: string; day_label: string; scoring_cap: number | null; active: number }>(
+		const cat = await findIn<{ id: number; name: string; rules: string; notes: string; day_label: string; scoring_cap: number | null; max_points: number | null; active: number }>(
 			'SELECT * FROM category WHERE id = ? AND game_id = ?', c.p[3], g.id, 'category');
 		const b = c.body;
 		const name = 'name' in b ? str(b.name, 80) : cat.name;
@@ -188,12 +188,13 @@ const routes: Route[] = [
 			if (!opts.some((o) => o.kind === 'tier')) throw bad('options needs at least one base line (kind "tier")');
 		}
 		const stmts = [
-			q('UPDATE category SET name = ?, rules = ?, notes = ?, day_label = ?, scoring_cap = ?, active = ? WHERE id = ?',
+			q('UPDATE category SET name = ?, rules = ?, notes = ?, day_label = ?, scoring_cap = ?, max_points = ?, active = ? WHERE id = ?',
 				name,
 				'rules' in b ? str(b.rules, 4000) : cat.rules,
 				'notes' in b ? str(b.notes, 4000) : cat.notes,
 				'day_label' in b ? str(b.day_label, 40) : cat.day_label,
 				'scoring_cap' in b ? intOrNull(b.scoring_cap) : cat.scoring_cap,
+				'max_points' in b ? positiveOrNull(b.max_points) : cat.max_points,
 				'active' in b ? (bool(b.active) ? 1 : 0) : cat.active,
 				cat.id)
 		];

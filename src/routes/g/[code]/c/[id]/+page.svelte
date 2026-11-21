@@ -29,6 +29,9 @@
 	{#if data.category.scoring_cap}
 		<p class="muted small" style="margin:0">Only your team's best {plural(data.category.scoring_cap, 'photo')} here score points. Every photo can still win votes.</p>
 	{/if}
+	{#if data.category.max_points}
+		<p class="muted small" style="margin:0">A team can count at most {pts(data.category.max_points)} pts here. A photo that would go past that doesn't count.</p>
+	{/if}
 	{#if data.category.notes}<p class="muted small" style="white-space:pre-wrap;margin:0">{data.category.notes}</p>{/if}
 </div>
 

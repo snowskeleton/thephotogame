@@ -7,7 +7,7 @@ import { scoreGame } from '#lib/server/scoring.ts';
 import { savePhotos } from '#lib/server/uploads.ts';
 
 type Category = {
-	id: number; name: string; rules: string; notes: string; day_label: string; scoring_cap: number | null; active: number;
+	id: number; name: string; rules: string; notes: string; day_label: string; scoring_cap: number | null; max_points: number | null; active: number;
 };
 const find = async (gameId: number, id: string) => {
 	const c = await get<Category>('SELECT * FROM category WHERE id = ? AND game_id = ?', Number(id), gameId);

@@ -1,13 +1,13 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { all, batch, get, q, run } from '#lib/server/db.ts';
-import { gameByCode, intOrNull, num, requireHost, str } from '#lib/server/game.ts';
+import { gameByCode, intOrNull, positiveOrNull, num, requireHost, str } from '#lib/server/game.ts';
 import { optionsFor } from '#lib/server/claims.ts';
 import { remove } from '#lib/server/images.ts';
 
 const find = async (code: string, id: string) => {
 	const game = await gameByCode(code);
 	const category = await get<{
-		id: number; name: string; rules: string; notes: string; day_label: string; scoring_cap: number | null; active: number;
+		id: number; name: string; rules: string; notes: string; day_label: string; scoring_cap: number | null; max_points: number | null; active: number;
 	}>('SELECT * FROM category WHERE id = ? AND game_id = ?', Number(id), game.id);
 	if (!category) error(404, 'No such category');
 	return { game, category };
@@ -41,12 +41,13 @@ export const actions = {
 		const keep = rows.filter((r) => r.id).map((r) => r.id);
 		await batch([
 			q(
-				'UPDATE category SET name = ?, rules = ?, notes = ?, day_label = ?, scoring_cap = ?, active = ? WHERE id = ?',
+				'UPDATE category SET name = ?, rules = ?, notes = ?, day_label = ?, scoring_cap = ?, max_points = ?, active = ? WHERE id = ?',
 				name,
 				str(f.get('rules'), 4000),
 				str(f.get('notes'), 4000),
 				str(f.get('day_label'), 40),
 				intOrNull(f.get('scoring_cap')),
+				positiveOrNull(f.get('max_points')),
 				f.get('active') ? 1 : 0,
 				category.id
 			),

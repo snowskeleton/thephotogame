@@ -45,6 +45,9 @@
 		<label>How many photos per team can score here? (empty for no limit)
 			<input name="scoring_cap" type="number" min="1" defaultValue={c.scoring_cap ?? ''} /></label>
 		<p class="muted small" style="margin:0">With a limit, a team's highest-scoring photos count. All photos can still win votes.</p>
+		<label>Most points one team can count here (empty for no limit)
+			<input name="max_points" inputmode="decimal" defaultValue={c.max_points ?? ''} placeholder="e.g. 10" /></label>
+		<p class="muted small" style="margin:0">Photos can still be scored above this. Going best-first, a photo that would take the team past the limit doesn't count.</p>
 	</div>
 
 	{#if form?.error}<p class="err">{form.error}</p>{/if}
