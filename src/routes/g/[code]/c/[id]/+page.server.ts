@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { all, get } from '#lib/server/db.ts';
 import { enter } from '#lib/server/game.ts';
-import { optionsFor } from '#lib/server/claims.ts';
+import { optionsFor, otherOptionsFor } from '#lib/server/claims.ts';
 import { listPhotos } from '#lib/server/photos.ts';
 import { scoreGame } from '#lib/server/scoring.ts';
 import { savePhotos } from '#lib/server/uploads.ts';
@@ -30,6 +30,7 @@ export const load = async ({ params, locals, url }) => {
 	return {
 		category,
 		options: await optionsFor(category.id),
+		also: viewer.isHost ? await otherOptionsFor(game.id, category.id) : [],
 		ours: ours.map((p) => ({ ...p, claims: claims.filter((c) => c.photo_id === p.id) })),
 		theirs: photos.filter((p) => p.team_id !== viewer.teamId),
 		categories: await all<{ id: number; name: string }>(

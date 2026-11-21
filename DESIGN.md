@@ -211,5 +211,9 @@ a photo returns to the list too. The Gallery tab remembers the last filters for 
 
 Scoring options come in three kinds: a **base** line (pick one), an **extra** (per item, with a count) and a
 **bonus** (a flat add-on that is ticked or not). Bonuses stack with the base line, extras and each other.
+A photo can also earn points from the game's *other* categories: in the host's Edit panel, "Also earns points
+from other categories" lists every other category's options (a fit-check photo with a hidden Mickey and a wild
+creature). Those add to the photo's own points. They don't fill the other category's bingo square or count
+toward its photo or point limits, and they show on the photo as "Found one (Hidden Mickey)".
 Players add a caption when they sort a photo on the board (saved as soon as they leave the field) or when
 they upload straight into a category.

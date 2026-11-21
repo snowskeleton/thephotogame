@@ -76,7 +76,7 @@
 					<details>
 						<summary>Edit</summary>
 						<div class="stack" style="margin-top:10px">
-							<PhotoEditor photo={p} code={data.game.code} options={data.options} claims={p.claims} categories={data.categories} canScore={data.isHost} />
+							<PhotoEditor photo={p} code={data.game.code} options={data.options} claims={p.claims} categories={data.categories} canScore={data.isHost} also={data.also} />
 						</div>
 					</details>
 				{/if}

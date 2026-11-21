@@ -44,7 +44,7 @@
 
 	<div>
 		{#each data.claims as c}
-			<div class="spread small"><span>{c.label}{c.qty !== 1 ? ` × ${c.qty}` : ''}</span><span>{pts(c.points * c.qty)}</span></div>
+			<div class="spread small"><span>{c.label}{c.qty !== 1 ? ` × ${c.qty}` : ''}{#if c.category_id !== p.category_id} <span class="muted">({c.category})</span>{/if}</span><span>{pts(c.points * c.qty)}</span></div>
 		{/each}
 		{#if data.override != null}
 			<div class="spread small"><span>Set by the showrunner</span><span>{pts(data.override)}</span></div>
@@ -99,7 +99,7 @@
 	<details class="card">
 		<summary>Edit photo</summary>
 		<div class="stack" style="margin-top:12px">
-			<PhotoEditor photo={p} code={data.game.code} options={data.options} claims={data.claims} categories={data.categories} canScore={data.isHost} context={data.nav?.context ?? ''} />
+			<PhotoEditor photo={p} code={data.game.code} options={data.options} claims={data.claims} categories={data.categories} canScore={data.isHost} also={data.also} context={data.nav?.context ?? ''} />
 		</div>
 	</details>
 {/if}

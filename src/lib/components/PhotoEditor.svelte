@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { goto, invalidateAll } from '$app/navigation';
 	import ClaimFields from './ClaimFields.svelte';
+	import AlsoFields from './AlsoFields.svelte';
 
 	type Option = { id: number; label: string; points: number; kind: string };
 	let {
@@ -11,6 +12,7 @@
 		claims,
 		categories,
 		canScore = false,
+		also = [],
 		context = ''
 	}: {
 		photo: { id: number; category_id: number; caption: string };
@@ -20,6 +22,8 @@
 		categories: { id: number; name: string }[];
 		/** Only the host assigns points. */
 		canScore?: boolean;
+		/** Options from the game's other categories the host can also credit this photo with. */
+		also?: (Option & { category: string })[];
 		/** Query string of the list this photo was opened from ("?from=gallery&…"); kept when the photo is deleted. */
 		context?: string;
 	} = $props();
@@ -60,6 +64,7 @@
 		<p class="muted small" style="margin:0">Moving clears the photo's points. The host sets them again.</p>
 	{:else if canScore}
 		<ClaimFields {options} {claims} />
+		<AlsoFields options={also} {claims} />
 	{/if}
 	<label>Caption <input name="caption" maxlength="200" defaultValue={photo.caption} /></label>
 	{#if msg}<p class="ok small" style="margin:0">{msg}</p>{/if}

@@ -1,7 +1,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
-import { all, get, run } from '#lib/server/db.ts';
+import { all, batch, get, run } from '#lib/server/db.ts';
 import { canSee, enter, num, str } from '#lib/server/game.ts';
-import { optionsFor, saveClaims } from '#lib/server/claims.ts';
+import { alsoStatements, optionsFor, otherOptionsFor, saveClaims } from '#lib/server/claims.ts';
 import { remove } from '#lib/server/images.ts';
 import { giveTeamPoints } from '#lib/server/grants.ts';
 import { browseFilter, listPhotos, onePhoto } from '#lib/server/photos.ts';
@@ -65,10 +65,13 @@ export const load = async (event) => {
 		override: (await get<{ points_override: number | null }>('SELECT points_override FROM photo WHERE id = ?', photo.id))!
 			.points_override,
 		options: await optionsFor(photo.category_id),
-		claims: await all<{ option_id: number; qty: number; label: string; points: number }>(
-			`SELECT c.option_id, c.qty, o.label, o.points FROM photo_claim c
-			 JOIN score_option o ON o.id = c.option_id WHERE c.photo_id = ? ORDER BY o.sort, o.id`,
-			photo.id
+		also: viewer.isHost ? await otherOptionsFor(game.id, photo.category_id) : [],
+		claims: await all<{ option_id: number; qty: number; label: string; points: number; category: string; category_id: number }>(
+			`SELECT c.option_id, c.qty, o.label, o.points, o.category_id, cat.name AS category FROM photo_claim c
+			 JOIN score_option o ON o.id = c.option_id JOIN category cat ON cat.id = o.category_id
+			 WHERE c.photo_id = ? ORDER BY (o.category_id != ?), o.sort, o.id`,
+			photo.id,
+			photo.category_id
 		),
 		doubts: await doubtCount(photo.id),
 		doubted: !!await get('SELECT 1 FROM doubt WHERE photo_id = ? AND user_id = ?', photo.id, viewer.user.id),
@@ -136,7 +139,11 @@ export const actions = {
 			return { saved: true, moved: target.name };
 		}
 		// Players keep their caption; points are assigned by the host only.
-		if (viewer.isHost) await saveClaims(photo.id, photo.category_id, f);
+		if (viewer.isHost) {
+			await saveClaims(photo.id, photo.category_id, f);
+			// Only when the form had the "also" section, so other callers can't wipe these by omission.
+			if (f.get('also_present')) await batch(await alsoStatements(photo.id, game, photo.category_id, f));
+		}
 		await run('UPDATE photo SET caption = ? WHERE id = ?', str(f.get('caption'), 200), photo.id);
 		return { saved: true };
 	},
