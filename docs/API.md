@@ -56,6 +56,8 @@ GET|POST         /api/v1/games/:code/awards {name, description, points, scope}
 PATCH|DELETE     /api/v1/games/:code/awards/:id       (PATCH may set status: draft|open|closed)
 GET              /api/v1/games/:code/photos?category=&team=&status=&user=&limit=
 PATCH|DELETE     /api/v1/games/:code/photos/:id       (PATCH: status ok|disqualified, points_override)
+GET|POST         /api/v1/games/:code/superlatives {title, kind: person|team|photo, user_id|team_id|photo_id, note?}
+DELETE           /api/v1/games/:code/superlatives/:id
 GET|POST         /api/v1/games/:code/webhooks {name, kind: ember|json, url, secret?, events?, hidden_ok?, active?}
 PATCH|DELETE     /api/v1/games/:code/webhooks/:id     (PATCH: same fields; a blank url or secret keeps the old one)
 POST             /api/v1/games/:code/webhooks/:id/test
@@ -67,13 +69,19 @@ GET              /api/v1/logs/summary                       (counts per kind ove
 GET|POST         /api/v1/people {name, email, game?}  (site:read / site:write)
 ```
 
+## Superlatives
+
+A host-made, free-text title ("Most likely to nap") given to one player, one team or one photo; no points. Players see
+them on the Scores page (a photo's only if they may see the photo). `GET` needs `games:read`; `POST` and `DELETE` need
+`games:write`. A new one fires `superlative.awarded` on the game's webhooks. A game can have 200.
+
 ## Webhooks
 
 A game can tell a chat room or another service when things happen (`games:read` to list, `games:write` to change). The
 address holds a secret key, so it is write-only: lists show only its origin. In the app: Game admin → Webhooks.
 
 Events (`events` defaults to all): `photo.added`, `photo.filed`, `photo.scored`, `photo.disqualified`, `photo.restored`,
-`photo.review`, `points.granted`.
+`photo.review`, `points.granted`, `superlative.awarded`.
 
 - `kind: ember` posts to an Ember or Campfire room's bot address (`https://<chat>/rooms/<room>/<bot key>/messages`).
   A new photo is posted as the picture, which starts its thread; the who/where/caption line and every later event about that

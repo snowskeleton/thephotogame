@@ -1,6 +1,7 @@
 import { all } from '#lib/server/db.ts';
 import { canSee, enter } from '#lib/server/game.ts';
 import { scoreGame } from '#lib/server/scoring.ts';
+import { listSuperlatives } from '#lib/server/superlatives.ts';
 
 export const load = async ({ params, locals, url }) => {
 	const { game, viewer } = await enter(locals, params.code);
@@ -44,7 +45,13 @@ export const load = async ({ params, locals, url }) => {
 			.map((p) => ({ id: p!.id, color: p!.color }))
 	}));
 
+	// A photo's superlative is shown only to people who may see the photo, as with awards.
+	const superlatives = (await listSuperlatives(game.id))
+		.filter((x) => x.kind !== 'photo' || canSee(game, viewer, { team_id: x.photo_team_id!, created_at: x.photo_created_at! }))
+		.map((x) => ({ id: x.id, title: x.title, note: x.note, kind: x.kind, who: x.who, team: x.team, color: x.color, photo: x.photo_id ? { id: x.photo_id, color: x.color ?? '', status: x.photo_status ?? 'ok' } : null }));
+
 	return {
+		superlatives,
 		teams: s.teams,
 		categoryCount: s.categoryCount,
 		people,

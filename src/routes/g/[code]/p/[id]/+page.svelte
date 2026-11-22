@@ -107,6 +107,7 @@
 {#if data.isHost}
 	<div class="card stack">
 		<h2 style="margin:0">Showrunner</h2>
+		<a class="btn sm" href="/g/{data.game.code}/admin/superlatives?photo={p.id}">🏆 Give a superlative</a>
 		<form method="POST" action="?/settle" class="row" use:enhance>
 			{#if p.status !== 'ok'}<button name="to" value="ok" class="grow">✓ {p.status === 'review' ? 'Approve' : 'Restore'}</button>{/if}
 			{#if p.status !== 'disqualified'}<button name="to" value="disqualified" class="grow danger">✖ Disqualify</button>{/if}
