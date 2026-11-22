@@ -311,4 +311,20 @@ describe('webhooks', () => {
 	});
 });
 
+describe('superlatives', () => {
+	it('gives, lists and deletes them over the API, and needs games:write to change', async () => {
+		const w = await world();
+		const t = await key(w.host.id, ALL_GAME, w.g.id);
+		const readOnly = await key(w.host.id, ['games:read'], w.g.id);
+		const path = `games/${w.g.code}/superlatives`;
+		const body = { title: 'Loudest', kind: 'team', team_id: w.tA };
+		expect((await api(path, readOnly, { method: 'POST', body })).status).toBe(403);
+		const made = await json(await api(path, t, { method: 'POST', body }));
+		expect((await api(path, t, { method: 'POST', body: { title: '', kind: 'team', team_id: w.tA } })).status).toBe(400);
+		expect(await json(await api(path, readOnly))).toMatchObject([{ id: made.id, title: 'Loudest', kind: 'team', recipient: expect.any(String) }]);
+		expect((await api(`${path}/${made.id}`, t, { method: 'DELETE' })).status).toBe(200);
+		expect(await json(await api(path, t))).toEqual([]);
+	});
+});
+
 void post; void session;

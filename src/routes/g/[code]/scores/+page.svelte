@@ -80,6 +80,22 @@
 	{/each}
 {/if}
 
+{#if data.superlatives.length}
+	<h2 style="margin-top:20px">Superlatives</h2>
+	{#each data.superlatives as s (s.id)}
+		<div class="card stack" style="{tv(s.color ?? 'var(--line)')}">
+			<strong>🏆 {s.title}</strong>
+			<div class="row">
+				{#if s.photo}<div style="width:72px"><Thumb photo={s.photo} code={data.game.code} /></div>{/if}
+				<div class="grow">
+					<span class="pill team">{s.kind === 'team' ? `Team ${s.who}` : s.team ? `${s.who} · ${s.team}` : s.who}</span>
+					{#if s.note}<div class="muted small">{s.note}</div>{/if}
+				</div>
+			</div>
+		</div>
+	{/each}
+{/if}
+
 <style>
 	.bar { height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; margin: 10px 0 8px; }
 	.bar div { height: 100%; background: var(--team-bg, var(--team)); border-radius: 999px; }

@@ -4,6 +4,7 @@ import type { Game } from './game.ts';
 import { key as photoKey } from './images.ts';
 import { logEvent } from './log.ts';
 import { scoreGame } from './scoring.ts';
+import { oneSuperlative, type Superlative } from './superlatives.ts';
 import { plural, pts } from '../format.ts';
 
 /**
@@ -24,7 +25,8 @@ export const EVENTS = {
 	'photo.disqualified': 'A photo is disqualified',
 	'photo.restored': 'A disqualified or doubted photo is put back in play',
 	'photo.review': 'Players doubt a photo enough to send it to review',
-	'points.granted': 'A team is given extra points'
+	'points.granted': 'A team is given extra points',
+	'superlative.awarded': 'A host gives a superlative to a person, team or photo'
 } as const;
 export type EventName = keyof typeof EVENTS;
 export const isEvent = (s: string): s is EventName => s in EVENTS;
@@ -134,7 +136,7 @@ type Photo = {
 	id: number; game_id: number; team_id: number; status: string; caption: string; ext: string; created_at: number;
 	category_id: number | null; category: string | null; who: string; team: string; points_override: number | null;
 };
-type Extra = { doubts?: number; grantId?: number; teamId?: number };
+type Extra = { doubts?: number; grantId?: number; teamId?: number; superlativeId?: number };
 type Say = { text: string; data: Record<string, unknown> };
 
 let origin = '';
@@ -178,6 +180,8 @@ export async function deliver(event: EventName, photoId: number | null, extra: E
 			)
 		: undefined;
 	if (event === 'points.granted' && !grant) return;
+	const sup = extra.superlativeId ? await oneSuperlative(extra.superlativeId) : undefined;
+	if (event === 'superlative.awarded' && !sup) return;
 	const teamTotal = (id: number) => scores?.teams.find((t) => t.id === id)?.total ?? null;
 	const photoUrl = photo && origin ? `${origin}/g/${game.code}/p/${photo.id}` : null;
 
@@ -186,7 +190,7 @@ export async function deliver(event: EventName, photoId: number | null, extra: E
 		try {
 			const post = photo ? await get<{ root_id: string; points: number | null }>('SELECT root_id, points FROM webhook_post WHERE webhook_id = ? AND photo_id = ?', h.id, photo.id) : undefined;
 			const claimed = photo ? scores?.photoScores.get(photo.id) : undefined;
-			const say = describe(event, { game, photo, photoUrl, grant, extra, claimed, prev: post?.points ?? null, total: teamTotal(photo?.team_id ?? grant?.team_id ?? -1) });
+			const say = describe(event, { game, photo, photoUrl, grant, sup, extra, claimed, prev: post?.points ?? null, total: teamTotal(photo?.team_id ?? grant?.team_id ?? -1) });
 			if (!say) continue;
 			const status = h.kind === 'json' ? await sendJson(h, event, game, photo, say) : await sendEmber(h, event, photo, say, post?.root_id ?? '');
 			if (event === 'photo.scored' && photo && claimed) await rememberPoints(h.id, photo.id, claimed.claimed);
@@ -209,7 +213,7 @@ const rememberPoints = (hookId: number, photoId: number, points: number | null) 
 	);
 
 type Ctx = {
-	game: Game; photo?: Photo; photoUrl: string | null; grant?: { title: string; note: string; points: number; team: string };
+	game: Game; photo?: Photo; photoUrl: string | null; grant?: { title: string; note: string; points: number; team: string }; sup?: Superlative;
 	extra: Extra; claimed?: { claimed: number; points: number; counted: boolean; pending: boolean }; prev: number | null; total: number | null;
 };
 
@@ -251,6 +255,16 @@ function describe(event: EventName, c: Ctx): Say | null {
 			text = `${plural(c.extra.doubts ?? 0, 'player')} doubt${c.extra.doubts === 1 ? 's' : ''} this photo, so the host will review it.`;
 			data.doubts = c.extra.doubts ?? 0;
 			break;
+		case 'superlative.awarded': {
+			const s = c.sup!;
+			data.title = s.title;
+			data.kind = s.kind;
+			data.recipient = s.who;
+			data.note = s.note;
+			const to = s.kind === 'photo' ? `this photo (${s.who}, ${s.team})` : s.kind === 'team' ? `team ${s.who}` : `${s.who}${s.team ? ` (${s.team})` : ''}`;
+			text = `🏆 Superlative “${s.title}” goes to ${to}${s.note ? `: ${s.note}` : ''}.`;
+			break;
+		}
 		case 'points.granted': {
 			const g = c.grant!;
 			data.points = g.points;

@@ -160,6 +160,28 @@ describe('ember', () => {
 	});
 });
 
+describe('superlatives', () => {
+	it('posts in the photo’s thread for a photo, and as a plain message for a team', async () => {
+		const { game, photo, team } = await world();
+		await hook(game.id, { events: ['photo.added', 'superlative.awarded'] });
+		await deliver('photo.added', photo);
+		calls.length = 0;
+		// Straight into the table, so the app's own background announcement doesn't mix into the calls under test.
+		const { insert } = await import('../../src/lib/server/db.ts');
+		const row = (title: string, kind: string, u: number | null, t: number | null, p: number | null) =>
+			insert('INSERT INTO superlative (game_id, title, kind, user_id, team_id, photo_id, created_at) VALUES (?, ?, ?, ?, ?, ?, 1)', game.id, title, kind, u, t, p);
+		const a = { id: await row('Best hat', 'photo', null, null, photo) };
+		const b = { id: await row('Loudest', 'team', null, team, null) };
+		calls.length = 0;
+		await deliver('superlative.awarded', photo, { superlativeId: a.id }, game.id);
+		expect(calls[0].url).toBe(`${ROOM}?thread=m1`);
+		expect(String(calls[0].body)).toContain('Superlative “Best hat” goes to this photo');
+		await deliver('superlative.awarded', null, { superlativeId: b.id }, game.id);
+		expect(calls[1].url).toBe(ROOM);
+		expect(String(calls[1].body)).toContain('“Loudest” goes to team Reds');
+	});
+});
+
 describe('hidden games', () => {
 	it('keeps unrevealed photos from a webhook unless the host allowed it', async () => {
 		const { game, photo } = await world({ visibility: 'hidden', revealed: 0 });

@@ -9,6 +9,7 @@ import { actorFromToken, type Actor, type Scope } from '#lib/server/perms.ts';
 import { scoreGame } from '#lib/server/scoring.ts';
 import { saveSettings, settings } from '#lib/server/settings.ts';
 import { listEvents, logEvent, summary } from '#lib/server/log.ts';
+import { addSuperlative, listSuperlatives, removeSuperlative } from '#lib/server/superlatives.ts';
 import { addWebhook, announce, listWebhooks, publicHook, testWebhook, updateWebhook } from '#lib/server/webhooks.ts';
 
 /**
@@ -328,6 +329,22 @@ const routes: Route[] = [
 		const p = await findIn<{ id: number; ext: string }>('SELECT id, ext FROM photo WHERE id = ? AND game_id = ?', c.p[3], (await theGame(c)).id, 'photo');
 		await run('DELETE FROM photo WHERE id = ?', p.id);
 		await remove([p]);
+		return { ok: true };
+	} },
+
+	// ---- superlatives: free-text titles a host gives to a player, a team or a photo
+	{ method: 'GET', path: 'games/:code/superlatives', scope: 'games:read', game: true, run: async (c) =>
+		(await listSuperlatives((await theGame(c)).id)).map((s) => ({ id: s.id, title: s.title, note: s.note, kind: s.kind, user_id: s.user_id, team_id: s.team_id, photo_id: s.photo_id, recipient: s.who, created_at: s.created_at })) },
+	{ method: 'POST', path: 'games/:code/superlatives', scope: 'games:write', game: true, run: async (c) => {
+		const g = await theGame(c);
+		const kind = c.body.kind === 'team' ? 'team' : c.body.kind === 'photo' ? 'photo' : 'person';
+		const to = kind === 'team' ? c.body.team_id : kind === 'photo' ? c.body.photo_id : c.body.user_id;
+		const r = await addSuperlative(g.id, { title: c.body.title, kind, to, note: c.body.note });
+		if ('error' in r) throw bad(r.error);
+		return { id: r.id };
+	} },
+	{ method: 'DELETE', path: 'games/:code/superlatives/:id', scope: 'games:write', game: true, run: async (c) => {
+		await removeSuperlative((await theGame(c)).id, Number(c.p[3]) || 0);
 		return { ok: true };
 	} },
 
