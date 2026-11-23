@@ -186,12 +186,13 @@ test.describe('reordering categories by dragging', () => {
 		const c4 = site.category(world.g.id, 'Fourth');
 		await site.signIn(page, world.host.id);
 		await page.goto(`/g/${world.g.code}/admin/categories`);
-		expect(await names(page)).toEqual(['Silly hats', 'Dogs', 'Third', 'Fourth']);
+		await expect.poll(() => names(page)).toEqual(['Silly hats', 'Dogs', 'Third', 'Fourth']);
+		await page.waitForLoadState('networkidle');
 		await drag(page, 'Fourth', 'Silly hats', 'above');
 		await expect.poll(() => names(page)).toEqual(['Fourth', 'Silly hats', 'Dogs', 'Third']);
 		await expect.poll(() => site.all('SELECT name FROM category WHERE game_id = ? ORDER BY sort, id', world.g.id).map((r) => r.name)).toEqual(['Fourth', 'Silly hats', 'Dogs', 'Third']);
 		await page.reload();
-		expect(await names(page)).toEqual(['Fourth', 'Silly hats', 'Dogs', 'Third']);
+		await expect.poll(() => names(page)).toEqual(['Fourth', 'Silly hats', 'Dogs', 'Third']);
 		// The board shows the same order.
 		await page.goto(`/g/${world.g.code}`);
 		await expect(page.locator('a.cell .name').first()).toHaveText('Fourth');
