@@ -96,13 +96,13 @@ describe('photo scoring', () => {
 		expect(s.photoScores.get(ids[0])!.counted).toBe(false);
 	});
 
-	it('skips a photo that would pass max_points but still fits a smaller one', async () => {
+	it('clamps the category total to max_points', async () => {
 		const { g, team, user, cat } = await setup({ max: 10 });
 		for (const pts of [8, 5, 2]) {
 			const o = await mkOption(cat, pts);
 			await claim(await mkPhoto(g, { cat, team, user }), o);
 		}
-		// 8 fits, 5 would make 13, 2 still fits.
+		// 8 + 5 + 2 = 15, clamped to 10.
 		expect((await teamTotal(g.id, team)).photoPts).toBe(10);
 	});
 
@@ -148,10 +148,10 @@ describe('photo scoring', () => {
 			await claim(p, tc);
 			ids.push(p);
 		}
-		// 8 + 8 fits; the third 8 would make 24 against 20.
+		// Four 8s add up to 32; the team's total for the category is clamped to 20.
 		const s = await scoreGame(await game(g.id));
-		expect(s.teams[0].photoPts).toBe(16);
-		expect(ids.map((i) => s.photoScores.get(i)!.points)).toEqual([8, 0, 0]);
+		expect(s.teams[0].photoPts).toBe(20);
+		expect(ids.map((i) => s.photoScores.get(i)!.points)).toEqual([8, 8, 8]);
 	});
 
 	it('points earned from another category use up that category’s scoring_cap', async () => {

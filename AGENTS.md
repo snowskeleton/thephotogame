@@ -76,6 +76,8 @@ before opening a PR.
 | `npm run test:ui` | Builds, then Playwright in `tests/ui/` drives real Chromium against the built Worker under `wrangler dev --local` | ~2 min |
 | `npm run test:all` | all three | |
 
+Run ALL three suites (`npm run test:all`) before merging or pushing to `main`, for every change, including ones that look unrelated to the UI. Read the result; do not skip a suite because it is slow.
+
 **Unit** (`@cloudflare/vitest-plugin`, config `vitest.config.ts`, bindings in `tests/wrangler.test.jsonc`). Helpers in
 `tests/unit/helpers.ts` seed users, games, teams, photos and claims. The plugin does not roll D1 back between tests, so
 `useDatabase()` deletes the data tables before each test. Import app modules directly; `cloudflare:workers` works.

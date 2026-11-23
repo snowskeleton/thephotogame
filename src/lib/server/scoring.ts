@@ -127,18 +127,18 @@ async function computeScores(game: Game) {
 		const cat = Number(k.split(':')[1]);
 		const cap = capOf.get(cat);
 		const max = maxOf.get(cat);
+		// Points add up as normal. The photo cap keeps the best N entries; the point ceiling clamps the team's sum.
 		list.sort((a, b) => b.value - a.value || a.photo.id - b.photo.id);
-		// Best first. An entry that would push the team past the category's point ceiling doesn't count
-		// (a smaller one further down can still fit).
-		let counted = 0;
+		const kept = cap ? list.slice(0, cap) : list;
 		let sum = 0;
-		for (const e of list) {
-			if (cap && counted >= cap) continue;
-			if (max && sum + e.value > max + 1e-9) continue;
-			counted++;
+		for (const e of kept) {
 			sum += e.value;
 			if (e.own) photoScores.get(e.photo.id)!.counted = true;
 			give(e.photo, e.value);
+		}
+		if (max && sum > max) {
+			const t = list[0].photo.team_id;
+			teamPhotoPts.set(t, (teamPhotoPts.get(t) ?? 0) - (sum - max));
 		}
 		const own = list.find((e) => e.own);
 		if (own) {
@@ -146,7 +146,6 @@ async function computeScores(game: Game) {
 			filled.get(own.photo.team_id)!.add(cat);
 		}
 	}
-
 
 	// Voted awards: results only exist once voting is closed.
 	const awards = await all<{ id: number; points: number; scope: string }>(
