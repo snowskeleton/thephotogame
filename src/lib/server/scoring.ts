@@ -66,11 +66,14 @@ async function computeScores(game: Game) {
 		status: string;
 		points_override: number | null;
 		claimed: number;
+		own: number;
 		has_claim: number;
 	}>(
 		`SELECT p.id, p.category_id, p.team_id, p.user_id, p.status, p.points_override,
 			COALESCE((SELECT SUM(o.points * c.qty) FROM photo_claim c
 				JOIN score_option o ON o.id = c.option_id WHERE c.photo_id = p.id), 0) AS claimed,
+			COALESCE((SELECT SUM(o.points * c.qty) FROM photo_claim c
+				JOIN score_option o ON o.id = c.option_id WHERE c.photo_id = p.id AND o.category_id = p.category_id), 0) AS own,
 			(SELECT COUNT(*) FROM photo_claim c WHERE c.photo_id = p.id) AS has_claim
 		 FROM photo p WHERE p.game_id = ? AND p.category_id IS NOT NULL`,
 		game.id
@@ -79,9 +82,13 @@ async function computeScores(game: Game) {
 	const capOf = new Map(cats.map((c) => [c.id, c.scoring_cap]));
 	const maxOf = new Map(cats.map((c) => [c.id, c.max_points]));
 	const photoScores = new Map<number, PhotoScore>();
+	// What the category's cap and ceiling see: only points from the photo's own category. Points picked up from
+	// other categories (alsoStatements) still add to the photo but never use up this category's limit.
+	const capValue = new Map<number, number>();
 	const groups = new Map<string, typeof photos>();
 	for (const p of photos) {
 		const claimed = p.points_override ?? p.claimed;
+		capValue.set(p.id, p.points_override ?? p.own);
 		photoScores.set(p.id, { claimed, points: 0, counted: false, pending: p.points_override == null && !p.has_claim });
 		if (p.status !== 'ok' || !capOf.has(p.category_id)) continue;
 		const k = `${p.team_id}:${p.category_id}`;
@@ -101,7 +108,7 @@ async function computeScores(game: Game) {
 	for (const list of groups.values()) {
 		const cap = capOf.get(list[0].category_id);
 		const max = maxOf.get(list[0].category_id);
-		list.sort((a, b) => photoScores.get(b.id)!.claimed - photoScores.get(a.id)!.claimed || a.id - b.id);
+		list.sort((a, b) => capValue.get(b.id)! - capValue.get(a.id)! || a.id - b.id);
 		// Best photos first. A photo that would push the team past the category's point ceiling doesn't count
 		// (a smaller one further down can still fit).
 		let counted = 0;
@@ -109,14 +116,20 @@ async function computeScores(game: Game) {
 		list.forEach((p) => {
 			const s = photoScores.get(p.id)!;
 			if (cap && counted >= cap) return;
-			if (max && sum + s.claimed > max + 1e-9) return;
+			const own = capValue.get(p.id)!;
+			if (max && sum + own > max + 1e-9) return;
 			counted++;
-			sum += s.claimed;
+			sum += own;
 			s.counted = true;
 			s.points = s.claimed;
+		});
+		// Other-category points aren't limited by this category, so a photo past the cap keeps them.
+		for (const p of list) {
+			const s = photoScores.get(p.id)!;
+			if (!s.counted) s.points = p.points_override == null ? p.claimed - p.own : 0;
 			teamPhotoPts.set(p.team_id, (teamPhotoPts.get(p.team_id) ?? 0) + s.points);
 			personPts.set(p.user_id, (personPts.get(p.user_id) ?? 0) + s.points);
-		});
+		}
 		const t = list[0].team_id;
 		if (!filled.has(t)) filled.set(t, new Set());
 		filled.get(t)!.add(list[0].category_id);

@@ -106,6 +106,36 @@ describe('photo scoring', () => {
 		expect((await teamTotal(g.id, team)).photoPts).toBe(10);
 	});
 
+	it('keeps other categories’ points out of max_points and the ranking for it', async () => {
+		const { g, team, user, cat } = await setup({ max: 10 });
+		const other = await mkCategory(g.id, { sort: 5 });
+		const bonus = await mkOption(other, 6, 'bonus');
+		// 8 own + 6 from another category would be 14 against a ceiling of 10, but only the 8 counts toward it.
+		const a = await mkPhoto(g, { cat, team, user });
+		await claim(a, await mkOption(cat, 8));
+		await claim(a, bonus);
+		const b = await mkPhoto(g, { cat, team, user });
+		await claim(b, await mkOption(cat, 2));
+		const s = await scoreGame(await game(g.id));
+		expect(s.photoScores.get(a)).toMatchObject({ counted: true, points: 14 });
+		expect(s.photoScores.get(b)).toMatchObject({ counted: true, points: 2 });
+		expect(s.teams[0].photoPts).toBe(16);
+	});
+
+	it('a photo past scoring_cap still keeps its other-category points', async () => {
+		const { g, team, user, cat } = await setup({ cap: 1 });
+		const other = await mkCategory(g.id, { sort: 5 });
+		const bonus = await mkOption(other, 3, 'bonus');
+		const a = await mkPhoto(g, { cat, team, user });
+		await claim(a, await mkOption(cat, 9));
+		const b = await mkPhoto(g, { cat, team, user });
+		await claim(b, await mkOption(cat, 4));
+		await claim(b, bonus);
+		const s = await scoreGame(await game(g.id));
+		expect(s.photoScores.get(b)).toMatchObject({ counted: false, points: 3 });
+		expect(s.teams[0].photoPts).toBe(9 + 3);
+	});
+
 	it('applies caps per team, not across teams', async () => {
 		const { g, team, user, cat } = await setup({ cap: 1 });
 		const team2 = await mkTeam(g.id, 'Other');
