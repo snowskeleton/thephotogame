@@ -136,6 +136,41 @@ describe('photo scoring', () => {
 		expect(s.teams[0].photoPts).toBe(9 + 3);
 	});
 
+	it('points earned from another category count toward that category’s max_points', async () => {
+		const { g, team, user, cat: colors } = await setup({ max: 20 });
+		const here = await mkCategory(g.id, { sort: 5 });
+		const tc = await mkOption(colors, 8, 'bonus');
+		const colorsPhoto = await mkPhoto(g, { cat: colors, team, user });
+		await claim(colorsPhoto, tc);
+		const ids = [];
+		for (let i = 0; i < 3; i++) {
+			const p = await mkPhoto(g, { cat: here, team, user });
+			await claim(p, tc);
+			ids.push(p);
+		}
+		// 8 + 8 fits; the third 8 would make 24 against 20.
+		const s = await scoreGame(await game(g.id));
+		expect(s.teams[0].photoPts).toBe(16);
+		expect(ids.map((i) => s.photoScores.get(i)!.points)).toEqual([8, 0, 0]);
+	});
+
+	it('points earned from another category use up that category’s scoring_cap', async () => {
+		const { g, team, user, cat: colors } = await setup({ cap: 2 });
+		const here = await mkCategory(g.id, { sort: 5 });
+		const tc = await mkOption(colors, 1, 'bonus');
+		for (let i = 0; i < 4; i++) await claim(await mkPhoto(g, { cat: here, team, user }), tc);
+		expect((await teamTotal(g.id, team)).photoPts).toBe(2);
+	});
+
+	it('an override replaces the whole score and does not stack into other categories', async () => {
+		const { g, team, user, cat: colors } = await setup({ max: 5 });
+		const here = await mkCategory(g.id, { sort: 5 });
+		const tc = await mkOption(colors, 4, 'bonus');
+		const p = await mkPhoto(g, { cat: here, team, user, override: 10 });
+		await claim(p, tc);
+		expect((await teamTotal(g.id, team)).photoPts).toBe(10);
+	});
+
 	it('applies caps per team, not across teams', async () => {
 		const { g, team, user, cat } = await setup({ cap: 1 });
 		const team2 = await mkTeam(g.id, 'Other');

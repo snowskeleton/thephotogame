@@ -65,75 +65,88 @@ async function computeScores(game: Game) {
 		user_id: number;
 		status: string;
 		points_override: number | null;
-		claimed: number;
-		own: number;
 		has_claim: number;
 	}>(
 		`SELECT p.id, p.category_id, p.team_id, p.user_id, p.status, p.points_override,
-			COALESCE((SELECT SUM(o.points * c.qty) FROM photo_claim c
-				JOIN score_option o ON o.id = c.option_id WHERE c.photo_id = p.id), 0) AS claimed,
-			COALESCE((SELECT SUM(o.points * c.qty) FROM photo_claim c
-				JOIN score_option o ON o.id = c.option_id WHERE c.photo_id = p.id AND o.category_id = p.category_id), 0) AS own,
 			(SELECT COUNT(*) FROM photo_claim c WHERE c.photo_id = p.id) AS has_claim
 		 FROM photo p WHERE p.game_id = ? AND p.category_id IS NOT NULL`,
 		game.id
 	);
+	// What each photo claimed, per category the options belong to (its own category and any it also earns from).
+	const claimRows = await all<{ photo_id: number; category_id: number; v: number }>(
+		`SELECT c.photo_id, o.category_id, SUM(o.points * c.qty) AS v
+		 FROM photo_claim c JOIN score_option o ON o.id = c.option_id JOIN photo p ON p.id = c.photo_id
+		 WHERE p.game_id = ? GROUP BY c.photo_id, o.category_id`,
+		game.id
+	);
+	const claimsOf = new Map<number, Map<number, number>>();
+	for (const r of claimRows) {
+		if (!claimsOf.has(r.photo_id)) claimsOf.set(r.photo_id, new Map());
+		claimsOf.get(r.photo_id)!.set(r.category_id, r.v);
+	}
 
 	const capOf = new Map(cats.map((c) => [c.id, c.scoring_cap]));
 	const maxOf = new Map(cats.map((c) => [c.id, c.max_points]));
 	const photoScores = new Map<number, PhotoScore>();
-	// What the category's cap and ceiling see: only points from the photo's own category. Points picked up from
-	// other categories (alsoStatements) still add to the photo but never use up this category's limit.
-	const capValue = new Map<number, number>();
-	const groups = new Map<string, typeof photos>();
-	for (const p of photos) {
-		const claimed = p.points_override ?? p.claimed;
-		capValue.set(p.id, p.points_override ?? p.own);
-		photoScores.set(p.id, { claimed, points: 0, counted: false, pending: p.points_override == null && !p.has_claim });
-		if (p.status !== 'ok' || !capOf.has(p.category_id)) continue;
-		const k = `${p.team_id}:${p.category_id}`;
-		if (!groups.has(k)) groups.set(k, []);
-		groups.get(k)!.push(p);
-	}
-
 	const teamPhotoPts = new Map<number, number>();
 	const teamPhotos = new Map<number, number>();
 	const filled = new Map<number, Set<number>>();
 	const personPts = new Map<number, number>();
 	const personPhotos = new Map<number, number>();
+	const give = (p: { id: number; team_id: number; user_id: number }, pts: number) => {
+		photoScores.get(p.id)!.points += pts;
+		teamPhotoPts.set(p.team_id, (teamPhotoPts.get(p.team_id) ?? 0) + pts);
+		personPts.set(p.user_id, (personPts.get(p.user_id) ?? 0) + pts);
+	};
+
+	// A category's limits apply per team to everything that scores in it: photos filed there, plus photos from
+	// other categories that also earned points from its options (those count as one photo each, at the points
+	// they earned from this category). A host override replaces a photo's whole score, so it never stacks.
+	type Entry = { photo: (typeof photos)[number]; value: number; own: boolean };
+	const pools = new Map<string, Entry[]>();
 	for (const p of photos) {
+		const total = p.points_override ?? [...(claimsOf.get(p.id)?.values() ?? [])].reduce((a, b) => a + b, 0);
+		photoScores.set(p.id, { claimed: total, points: 0, counted: false, pending: p.points_override == null && !p.has_claim });
 		teamPhotos.set(p.team_id, (teamPhotos.get(p.team_id) ?? 0) + 1);
 		personPhotos.set(p.user_id, (personPhotos.get(p.user_id) ?? 0) + 1);
+		if (p.status !== 'ok' || !capOf.has(p.category_id)) continue;
+		const add = (cat: number, e: Entry) => {
+			const k = `${p.team_id}:${cat}`;
+			if (!pools.has(k)) pools.set(k, []);
+			pools.get(k)!.push(e);
+		};
+		add(p.category_id, { photo: p, value: p.points_override ?? claimsOf.get(p.id)?.get(p.category_id) ?? 0, own: true });
+		if (p.points_override != null) continue;
+		for (const [cat, v] of claimsOf.get(p.id) ?? []) {
+			if (cat === p.category_id) continue;
+			if (capOf.has(cat)) add(cat, { photo: p, value: v, own: false });
+			else give(p, v);
+		}
 	}
-	for (const list of groups.values()) {
-		const cap = capOf.get(list[0].category_id);
-		const max = maxOf.get(list[0].category_id);
-		list.sort((a, b) => capValue.get(b.id)! - capValue.get(a.id)! || a.id - b.id);
-		// Best photos first. A photo that would push the team past the category's point ceiling doesn't count
+	for (const [k, list] of pools) {
+		const cat = Number(k.split(':')[1]);
+		const cap = capOf.get(cat);
+		const max = maxOf.get(cat);
+		list.sort((a, b) => b.value - a.value || a.photo.id - b.photo.id);
+		// Best first. An entry that would push the team past the category's point ceiling doesn't count
 		// (a smaller one further down can still fit).
 		let counted = 0;
 		let sum = 0;
-		list.forEach((p) => {
-			const s = photoScores.get(p.id)!;
-			if (cap && counted >= cap) return;
-			const own = capValue.get(p.id)!;
-			if (max && sum + own > max + 1e-9) return;
+		for (const e of list) {
+			if (cap && counted >= cap) continue;
+			if (max && sum + e.value > max + 1e-9) continue;
 			counted++;
-			sum += own;
-			s.counted = true;
-			s.points = s.claimed;
-		});
-		// Other-category points aren't limited by this category, so a photo past the cap keeps them.
-		for (const p of list) {
-			const s = photoScores.get(p.id)!;
-			if (!s.counted) s.points = p.points_override == null ? p.claimed - p.own : 0;
-			teamPhotoPts.set(p.team_id, (teamPhotoPts.get(p.team_id) ?? 0) + s.points);
-			personPts.set(p.user_id, (personPts.get(p.user_id) ?? 0) + s.points);
+			sum += e.value;
+			if (e.own) photoScores.get(e.photo.id)!.counted = true;
+			give(e.photo, e.value);
 		}
-		const t = list[0].team_id;
-		if (!filled.has(t)) filled.set(t, new Set());
-		filled.get(t)!.add(list[0].category_id);
+		const own = list.find((e) => e.own);
+		if (own) {
+			if (!filled.has(own.photo.team_id)) filled.set(own.photo.team_id, new Set());
+			filled.get(own.photo.team_id)!.add(cat);
+		}
 	}
+
 
 	// Voted awards: results only exist once voting is closed.
 	const awards = await all<{ id: number; points: number; scope: string }>(
