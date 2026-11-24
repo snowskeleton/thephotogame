@@ -7,8 +7,8 @@ export const DEFAULTS = {
 	signups: '1',
 	/** How many games one person may create (site admins have no limit). */
 	max_games: '3',
-	/** Photos per game. R2's free tier is 10 GB; a phone photo plus its two copies is ~4–6 MB. */
-	max_photos: '1000',
+	/** Photos per game; 0 means no limit. A phone photo plus its two copies is ~4–6 MB in R2. */
+	max_photos: '0',
 	/** Sender for codes and invites, on a domain verified in Resend. Empty: Resend's test sender. */
 	mail_from: ''
 };

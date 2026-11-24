@@ -64,7 +64,7 @@ PATCH|DELETE     /api/v1/games/:code/webhooks/:id     (PATCH: same fields; a bla
 POST             /api/v1/games/:code/webhooks/:id/test
 GET|POST         /api/v1/games/:code/players {email, name?}
 PATCH|DELETE     /api/v1/games/:code/players/:userId  (PATCH: team_id)
-GET|PUT          /api/v1/settings                     (site:read / site:write: signups, maxGames, maxPhotos, mailFrom)
+GET|PUT          /api/v1/settings                     (site:read / site:write: signups, maxGames, maxPhotos (0 = no limit), mailFrom)
 GET              /api/v1/logs?level=&kind=&since=&limit=   (logs:read; since = 30m, 6h, 2d or a ms timestamp)
 GET              /api/v1/logs/summary                       (counts per kind over the last day)
 GET|POST         /api/v1/people {name, email, game?}  (site:read / site:write)

@@ -63,7 +63,7 @@ export async function savePhotos(game: Game, viewer: Viewer, f: FormData, catego
 	return { added: 1 };
 }
 
-/** Whether the game is at the site's photo limit. Games a site admin created have no limit. */
+/** Whether the game is at the site's photo limit (0 means no limit). Games a site admin created have no limit. */
 async function full(gameId: number) {
 	const { maxPhotos } = await settings();
 	const g = (await get<{ n: number; admin: number | null }>(
@@ -72,7 +72,7 @@ async function full(gameId: number) {
 		 FROM game g WHERE g.id = ?`,
 		gameId
 	))!;
-	return !g.admin && g.n >= maxPhotos;
+	return !g.admin && maxPhotos > 0 && g.n >= maxPhotos;
 }
 
 /** Moves a photo into a category. Claims belong to the old category's options, so they are cleared and the host scores it again. */
