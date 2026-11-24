@@ -71,5 +71,5 @@
 		position: absolute; right: 4px; top: 4px; width: 32px; height: 32px; display: grid; place-items: center;
 		background: rgba(0, 0, 0, 0.6); color: #fff; border-radius: 50%; text-decoration: none; z-index: 2;
 	}
-	.sticky { position: sticky; bottom: 78px; margin-top: 16px; }
+	.sticky { position: sticky; bottom: calc(78px + env(safe-area-inset-bottom)); margin-top: 16px; }
 </style>

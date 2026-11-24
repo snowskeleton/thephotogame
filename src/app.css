@@ -35,7 +35,11 @@ h1 { font-size: 1.7rem; }
 h2 { font-size: 1.2rem; }
 h3 { font-size: 1rem; }
 p { margin: 0 0 0.8em; }
-main { max-width: 720px; margin: 0 auto; padding: 16px 16px 110px; }
+main {
+	max-width: 720px;
+	margin: 0 auto;
+	padding: 16px max(16px, env(safe-area-inset-right)) calc(110px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
 .muted { color: var(--muted); }
 .small { font-size: 0.86rem; }
 .card {
@@ -107,7 +111,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 	gap: 10px;
 	max-width: 720px;
 	margin: 0 auto;
-	padding: 12px 16px 0;
+	padding: calc(12px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
 }
 .brand { font-weight: 800; text-decoration: none; font-size: 1.05rem; }
 .tabs {
@@ -117,7 +121,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 	justify-content: space-around;
 	background: var(--card);
 	border-top: 1px solid var(--line);
-	padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+	padding: 6px max(4px, env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(4px, env(safe-area-inset-left));
 	z-index: 10;
 }
 .tabs a {
