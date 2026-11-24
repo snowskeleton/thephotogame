@@ -100,11 +100,11 @@ describe('event log', () => {
 });
 
 describe('settings', () => {
-	it('has defaults', async () => expect(await settings()).toEqual({ signups: true, maxGames: 3, maxPhotos: 1000, mailFrom: '' }));
+	it('has defaults', async () => expect(await settings()).toEqual({ signups: true, maxGames: 3, maxPhotos: 0, mailFrom: '' }));
 	it('saves and updates values', async () => {
 		await saveSettings({ signups: false, maxGames: 7 });
 		await saveSettings({ maxGames: 9 });
-		expect(await settings()).toMatchObject({ signups: false, maxGames: 9, maxPhotos: 1000 });
+		expect(await settings()).toMatchObject({ signups: false, maxGames: 9, maxPhotos: 0 });
 	});
 });
 
@@ -293,6 +293,11 @@ describe('uploads', () => {
 		const admin = await mkUser({ admin: true });
 		await run('UPDATE game SET created_by = ? WHERE id = ?', admin, g.id);
 		expect(await savePhotos(g, viewer, upload(), category)).toEqual({ added: 1 });
+	});
+	it('has no photo limit when the setting is 0', async () => {
+		const { g, viewer, category } = await world();
+		await saveSettings({ maxPhotos: 0 });
+		for (let i = 0; i < 3; i++) expect(await savePhotos(g, viewer, upload(), category)).toEqual({ added: 1 });
 	});
 	it('removes the row when R2 fails', async () => {
 		const { g, viewer, category } = await world();

@@ -62,7 +62,7 @@
 		</p>
 		<label>Games one person can create <input name="max_games" type="number" min="0" defaultValue={s.maxGames} /></label>
 		<label>Photos per game <input name="max_photos" type="number" min="0" defaultValue={s.maxPhotos} /></label>
-		<p class="muted small" style="margin:0">Site admins, and games they create, aren’t limited. R2’s free tier holds about 10 GB, roughly 2,000 phone photos.</p>
+		<p class="muted small" style="margin:0">0 means no limit. Site admins, and games they create, are never limited. R2’s free tier holds about 10 GB, roughly 2,000 phone photos.</p>
 		{#if form?.saved}<p class="ok">Saved.</p>{/if}
 		<button class="primary">Save</button>
 	</form>
