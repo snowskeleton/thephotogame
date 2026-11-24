@@ -36,6 +36,13 @@
 		<span class="pill team">{p.who} · {p.team}</span>
 		<span class="muted small">{new Date(p.created_at).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' })}</span>
 	</div>
+	<div class="row small" style="gap:8px">
+		<span class="muted">Category</span>
+		<a class="pill" href="{base}/c/{p.category_id}">{p.category}</a>
+		{#each [...new Map(data.claims.filter((c) => c.category_id !== p.category_id).map((c) => [c.category_id, c.category]))] as [id, name] (id)}
+			<a class="pill" href="{base}/c/{id}" title="Earns points from this category's options">+ {name}</a>
+		{/each}
+	</div>
 	{#if p.caption}<p style="margin:0">{p.caption}</p>{/if}
 	<div class="row small" style="gap:12px">
 		<a href="{base}/gallery?user={p.user_id}">All from {p.who}</a>
