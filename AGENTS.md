@@ -54,6 +54,10 @@ The Photo Game: a mobile website for family photo scavenger hunts. Product rules
   routes that change sessions, passkeys, roles or keys.
 - **Photos:** a photo hidden by the reveal rules must be refused on both its page and `/media/...`.
 
+## Merging
+
+When a PR is open, all three suites pass locally and its CI checks pass, merge it (squash, delete the branch) without waiting to be asked. Stop only if a check fails or the work is unfinished.
+
 ## Setup
 
 ```bash
