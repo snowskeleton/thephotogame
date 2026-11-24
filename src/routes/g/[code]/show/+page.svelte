@@ -46,14 +46,14 @@
 <style>
 	.show { position: fixed; inset: 0; z-index: 50; background: #000; color: #fff; display: flex; }
 	img { width: 100%; height: 100%; object-fit: contain; }
-	.zone { position: absolute; top: 60px; bottom: 90px; width: 40%; background: none; border: 0; border-radius: 0; }
+	.zone { position: absolute; top: calc(60px + env(safe-area-inset-top)); bottom: calc(90px + env(safe-area-inset-bottom)); width: 40%; background: none; border: 0; border-radius: 0; }
 	.left { left: 0; }
 	.right { right: 0; }
 	.bar {
 		position: absolute; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px;
-		padding: 12px 16px; background: linear-gradient(var(--dir), rgba(0, 0, 0, 0.75), transparent);
+		padding: calc(12px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left)); background: linear-gradient(var(--dir), rgba(0, 0, 0, 0.75), transparent);
 	}
 	.top { top: 0; --dir: to bottom; }
-	.bottom { bottom: 0; --dir: to top; padding-bottom: calc(14px + env(safe-area-inset-bottom)); font-size: 1.1rem; }
+	.bottom { bottom: 0; --dir: to top; padding-top: 12px; padding-bottom: calc(14px + env(safe-area-inset-bottom)); font-size: 1.1rem; }
 	.bar :global(.btn), .bar button { background: rgba(255, 255, 255, 0.16); border-color: transparent; color: #fff; }
 </style>
