@@ -2,6 +2,7 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import { all, batch, get, q, run } from '#lib/server/db.ts';
 import { gameByCode, intOrNull, positiveOrNull, num, requireHost, str } from '#lib/server/game.ts';
 import { optionsFor } from '#lib/server/claims.ts';
+import { itemStatements, itemsFor, parseItems } from '#lib/server/items.ts';
 import { remove } from '#lib/server/images.ts';
 
 const find = async (code: string, id: string) => {
@@ -18,6 +19,7 @@ export const load = async ({ params }) => {
 	return {
 		category,
 		options: await optionsFor(category.id),
+		items: (await itemsFor(category.id)).map((i) => i.label),
 		photos: (await get<{ n: number }>('SELECT COUNT(*) AS n FROM photo WHERE category_id = ?', category.id))!.n
 	};
 };
@@ -37,6 +39,9 @@ export const actions = {
 		const rows = ids.map((id, i) => ({ id, label: labels[i], points: points[i], kind: kinds[i] })).filter((r) => r.label);
 		if (!rows.some((r) => r.kind === 'tier'))
 			return fail(400, { error: 'Add at least one base scoring line (not an extra), even if it’s worth 0.' });
+
+		const items = parseItems(f.get('items'));
+		if ('error' in items) return fail(400, { error: items.error });
 
 		const keep = rows.filter((r) => r.id).map((r) => r.id);
 		await batch([
@@ -66,7 +71,8 @@ export const actions = {
 							'INSERT INTO score_option (category_id, label, points, kind, sort) VALUES (?, ?, ?, ?, ?)',
 							category.id, r.label, r.points, r.kind, i
 						)
-			)
+			),
+			...(await itemStatements(category.id, items))
 		]);
 		redirect(303, `/g/${game.code}/admin/categories`);
 	},

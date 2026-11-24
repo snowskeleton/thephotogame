@@ -5,6 +5,7 @@ import { all, batch, get, insert, now, q, run } from '#lib/server/db.ts';
 import { createGame, gameByCode, intOrNull, num, positiveOrNull, str, type Game } from '#lib/server/game.ts';
 import { remove } from '#lib/server/images.ts';
 import { optionsFor } from '#lib/server/claims.ts';
+import { itemsFor, itemStatements, parseItems } from '#lib/server/items.ts';
 import { actorFromToken, type Actor, type Scope } from '#lib/server/perms.ts';
 import { scoreGame } from '#lib/server/scoring.ts';
 import { saveSettings, settings } from '#lib/server/settings.ts';
@@ -49,7 +50,7 @@ async function categories(gameId: number) {
 		'SELECT id, name, rules, notes, day_label, scoring_cap, max_points, sort, active FROM category WHERE game_id = ? ORDER BY sort, id',
 		gameId
 	);
-	return Promise.all(rows.map(async (c) => ({ ...c, active: !!c.active, options: await optionsFor(c.id) })));
+	return Promise.all(rows.map(async (c) => ({ ...c, active: !!c.active, options: await optionsFor(c.id), items: await itemsFor(c.id) })));
 }
 
 const teams = (gameId: number) =>
@@ -189,6 +190,13 @@ const routes: Route[] = [
 				.filter((o) => o.label);
 			if (!opts.some((o) => o.kind === 'tier')) throw bad('options needs at least one base line (kind "tier")');
 		}
+		// `items` (optional) replaces the checklist with a list of labels.
+		let items: string[] | null = null;
+		if ('items' in b) {
+			const parsed = parseItems(b.items);
+			if ('error' in parsed) throw bad(parsed.error);
+			items = parsed;
+		}
 		const stmts = [
 			q('UPDATE category SET name = ?, rules = ?, notes = ?, day_label = ?, scoring_cap = ?, max_points = ?, active = ? WHERE id = ?',
 				name,
@@ -211,6 +219,7 @@ const routes: Route[] = [
 				)
 			);
 		}
+		if (items) stmts.push(...(await itemStatements(cat.id, items)));
 		await batch(stmts);
 		return (await categories(g.id)).find((x) => x.id === cat.id);
 	} },
@@ -295,13 +304,13 @@ const routes: Route[] = [
 		const qs = c.url.searchParams;
 		const where = ['p.game_id = ?'];
 		const params: (string | number)[] = [g.id];
-		for (const [key, col] of [['category', 'p.category_id'], ['team', 'p.team_id'], ['status', 'p.status'], ['user', 'p.user_id']] as const)
+		for (const [key, col] of [['category', 'p.category_id'], ['item', 'p.item_id'], ['team', 'p.team_id'], ['status', 'p.status'], ['user', 'p.user_id']] as const)
 			if (qs.get(key)) (where.push(`${col} = ?`), params.push(key === 'status' ? qs.get(key)! : Number(qs.get(key))));
 		const limit = Math.min(500, Math.max(1, Number(qs.get('limit')) || 100));
 		return all(
-			`SELECT p.id, p.category_id, c.name AS category, p.team_id, t.name AS team, p.user_id, u.name AS photographer,
+			`SELECT p.id, p.category_id, c.name AS category, p.item_id, ci.label AS item, p.team_id, t.name AS team, p.user_id, u.name AS photographer,
 				p.caption, p.status, p.points_override, p.width, p.height, p.bytes, p.created_at
-			 FROM photo p LEFT JOIN category c ON c.id = p.category_id JOIN team t ON t.id = p.team_id JOIN user u ON u.id = p.user_id
+			 FROM photo p LEFT JOIN category c ON c.id = p.category_id LEFT JOIN category_item ci ON ci.id = p.item_id JOIN team t ON t.id = p.team_id JOIN user u ON u.id = p.user_id
 			 WHERE ${where.join(' AND ')} ORDER BY p.created_at DESC LIMIT ${limit}`,
 			...params
 		);

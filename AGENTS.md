@@ -27,7 +27,8 @@ The Photo Game: a mobile website for family photo scavenger hunts. Product rules
 - `src/routes/` pages and form actions (`+page.server.ts`), `api/v1/[...path]/+server.ts` is the whole JSON API.
 - `src/lib/server/` all server logic: `db.ts` (async `all/get/run/insert/batch/q`), `scoring.ts`, `claims.ts`,
   `grants.ts`, `game.ts` (viewer, host checks, visibility), `perms.ts` (API keys), `auth.ts`, `uploads.ts`, `images.ts`,
-  `log.ts`, `migrate.ts`, `webhooks.ts` (outgoing webhooks: Ember threads, signed JSON), `superlatives.ts` (host-given titles).
+  `log.ts`, `migrate.ts`, `webhooks.ts` (outgoing webhooks: Ember threads, signed JSON), `superlatives.ts` (host-given titles),
+  `items.ts` (category checklists: `category_item` rows, `photo.item_id`).
 - `src/lib/` browser code and shared helpers (`resize.ts` makes thumbnails in the browser, `browse.ts` gallery filters).
 - `migrations/NNNN_name.sql` the schema. The app applies new files itself on the first request each Worker instance
   serves and records them in `d1_migrations`. There is no migrate step.
@@ -52,6 +53,10 @@ The Photo Game: a mobile website for family photo scavenger hunts. Product rules
 - **API keys** act as their minter and are re-checked against the minter's current power on every request. Do not add
   routes that change sessions, passkeys, roles or keys.
 - **Photos:** a photo hidden by the reveal rules must be refused on both its page and `/media/...`.
+
+## Merging
+
+When a PR is open, all three suites pass locally and its CI checks pass, merge it (squash, delete the branch) without waiting to be asked. Stop only if a check fails or the work is unfinished.
 
 ## Setup
 

@@ -11,15 +11,18 @@
 		options,
 		claims,
 		categories,
+		items = [],
 		canScore = false,
 		also = [],
 		context = ''
 	}: {
-		photo: { id: number; category_id: number; caption: string };
+		photo: { id: number; category_id: number; item_id?: number | null; caption: string };
 		code: string;
 		options: Option[];
 		claims: { option_id: number; qty: number }[];
 		categories: { id: number; name: string }[];
+		/** The category's checklist; the photo can name the one item it ticks off. */
+		items?: { id: number; label: string }[];
 		/** Only the host assigns points. */
 		canScore?: boolean;
 		/** Options from the game's other categories the host can also credit this photo with. */
@@ -57,6 +60,15 @@
 		<label>Category
 			<select name="category" bind:value={cat}>
 				{#each categories as c}<option value={String(c.id)}>{c.name}</option>{/each}
+			</select>
+		</label>
+	{/if}
+	{#if items.length && !moving}
+		<input type="hidden" name="item_present" value="1" />
+		<label>Checklist item
+			<select name="item">
+				<option value="">None</option>
+				{#each items as i}<option value={i.id} selected={photo.item_id === i.id}>{i.label}</option>{/each}
 			</select>
 		</label>
 	{/if}

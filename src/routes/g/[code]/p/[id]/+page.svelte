@@ -24,6 +24,7 @@
 <div class="row" style="gap:8px;margin-top:8px">
 	<span class="muted small">Category</span>
 	<a class="pill" href="{base}/c/{p.category_id}">{p.category}</a>
+	{#if p.item}<a class="pill" href="{base}/gallery?cat={p.category_id}&item={p.item_id}" title="Checklist item">✓ {p.item}</a>{/if}
 	{#each [...new Map(data.claims.filter((c) => c.category_id !== p.category_id).map((c) => [c.category_id, c.category]))] as [id, name] (id)}
 		<a class="pill" href="{base}/c/{id}" title="Earns points from this category's options">+ {name}</a>
 	{/each}
@@ -116,7 +117,7 @@
 	<details class="card">
 		<summary>Edit photo</summary>
 		<div class="stack" style="margin-top:12px">
-			<PhotoEditor photo={p} code={data.game.code} options={data.options} claims={data.claims} categories={data.categories} canScore={data.isHost} also={data.also} context={data.nav?.context ?? ''} />
+			<PhotoEditor photo={p} code={data.game.code} options={data.options} claims={data.claims} categories={data.categories} items={data.items} canScore={data.isHost} also={data.also} context={data.nav?.context ?? ''} />
 		</div>
 	</details>
 {/if}

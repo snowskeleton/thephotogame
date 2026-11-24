@@ -1,9 +1,10 @@
-export type BrowseFilter = { cat?: number; team?: number; user?: number; day?: string; unscored?: boolean };
+export type BrowseFilter = { cat?: number; item?: number; team?: number; user?: number; day?: string; unscored?: boolean };
 
 /** The gallery filters as a query string, e.g. "?team=2&user=5" (empty when nothing is filtered). */
 export function browseQuery(f: BrowseFilter): string {
 	const p = new URLSearchParams();
 	if (f.cat) p.set('cat', String(f.cat));
+	if (f.item) p.set('item', String(f.item));
 	if (f.team) p.set('team', String(f.team));
 	if (f.user) p.set('user', String(f.user));
 	if (f.day) p.set('day', f.day);

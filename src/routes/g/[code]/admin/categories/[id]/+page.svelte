@@ -53,6 +53,17 @@
 		<p class="muted small" style="margin:0">Photos can still be scored above this. Going best-first, a photo that would take the team past the limit doesn't count.</p>
 	</div>
 
+	<div class="card stack">
+		<h2 style="margin:0">Checklist</h2>
+		<p class="muted small" style="margin:0">
+			Optional. List what this category is after, one per line (e.g. every state for license plates).
+			Players pick the item when they upload, the category page shows which ones their team has,
+			and the gallery can filter by item. Items carry no points of their own.
+			Removing a line unticks its photos; renaming one counts as a new item.
+		</p>
+		<textarea name="items" style="min-height:120px" placeholder="Alabama&#10;Alaska&#10;Arizona" aria-label="Checklist items">{data.items.join('\n')}</textarea>
+	</div>
+
 	{#if form?.error}<p class="err">{form.error}</p>{/if}
 	<button class="primary">Save category</button>
 </form>

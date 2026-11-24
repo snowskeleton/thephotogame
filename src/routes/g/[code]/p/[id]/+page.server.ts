@@ -7,6 +7,7 @@ import { giveTeamPoints } from '#lib/server/grants.ts';
 import { browseFilter, listPhotos, onePhoto } from '#lib/server/photos.ts';
 import { browseQuery, fromGallery } from '#lib/browse.ts';
 import { scoreGame } from '#lib/server/scoring.ts';
+import { itemIn, itemsFor } from '#lib/server/items.ts';
 import { categoryIn, fileInto } from '#lib/server/uploads.ts';
 import { announce } from '#lib/server/webhooks.ts';
 
@@ -35,6 +36,7 @@ async function browseNav(event: { url: URL }, game: Awaited<ReturnType<typeof ct
 		filter.user && (await get<{ name: string }>('SELECT name FROM user WHERE id = ?', filter.user))?.name,
 		filter.team && (await get<{ name: string }>('SELECT name FROM team WHERE id = ? AND game_id = ?', filter.team, game.id))?.name,
 		filter.cat && (await get<{ name: string }>('SELECT name FROM category WHERE id = ? AND game_id = ?', filter.cat, game.id))?.name,
+		filter.item && (await get<{ label: string }>('SELECT label FROM category_item WHERE id = ?', filter.item))?.label,
 		filter.day,
 		filter.unscored && 'unscored'
 	].filter(Boolean);
@@ -66,6 +68,7 @@ export const load = async (event) => {
 		override: (await get<{ points_override: number | null }>('SELECT points_override FROM photo WHERE id = ?', photo.id))!
 			.points_override,
 		options: await optionsFor(photo.category_id),
+		items: await itemsFor(photo.category_id),
 		also: viewer.isHost ? await otherOptionsFor(game.id, photo.category_id) : [],
 		claims: await all<{ option_id: number; qty: number; label: string; points: number; category: string; category_id: number }>(
 			`SELECT c.option_id, c.qty, o.label, o.points, o.category_id, cat.name AS category FROM photo_claim c
@@ -149,6 +152,8 @@ export const actions = {
 			if (f.get('also_present')) await batch(await alsoStatements(photo.id, game, photo.category_id, f));
 			announce('photo.scored', photo.id);
 		}
+		// Only when the form had the checklist, so other callers can't untick a photo by omission.
+		if (f.get('item_present')) await run('UPDATE photo SET item_id = ? WHERE id = ?', await itemIn(photo.category_id, f.get('item')), photo.id);
 		await run('UPDATE photo SET caption = ? WHERE id = ?', str(f.get('caption'), 200), photo.id);
 		return { saved: true };
 	},

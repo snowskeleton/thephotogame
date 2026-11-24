@@ -7,6 +7,7 @@
 	import PhotoEditor from '#lib/components/PhotoEditor.svelte';
 	let { data, form } = $props();
 	const open = $derived(data.game.submissions_open && data.category.active);
+	const foundSet = $derived(new Set(data.found));
 	const canEdit = (p: { user_id: number }) => p.user_id === data.user?.id || data.isHost;
 </script>
 
@@ -35,11 +36,37 @@
 	{#if data.category.notes}<p class="muted small" style="white-space:pre-wrap;margin:0">{data.category.notes}</p>{/if}
 </div>
 
+{#if data.items.length}
+	<div class="card stack">
+		<div class="spread">
+			<h2 style="margin:0">Checklist</h2>
+			<span class="pill team">{data.found.length} of {data.items.length}</span>
+		</div>
+		<ul class="checklist">
+			{#each data.items as i (i.id)}
+				<li class:done={foundSet.has(i.id)}>
+					<span class="box" aria-hidden="true">{foundSet.has(i.id) ? '✓' : ''}</span>
+					<a href="/g/{data.game.code}/gallery?cat={data.category.id}&item={i.id}">{i.label}</a>
+					<span class="sr">{foundSet.has(i.id) ? 'found' : 'not found yet'}</span>
+				</li>
+			{/each}
+		</ul>
+	</div>
+{/if}
+
 {#if data.team && open}
 	<div class="card stack" style="border-color:var(--team);border-width:2px">
 		<h2 style="margin:0">Add photos here</h2>
 		<Uploader>
 			{#snippet fields()}
+				{#if data.items.length}
+					<label>Checklist item (optional)
+						<select name="item">
+							<option value="">None</option>
+							{#each data.items as i}<option value={i.id}>{foundSet.has(i.id) ? '✓ ' : ''}{i.label}</option>{/each}
+						</select>
+					</label>
+				{/if}
 				{#if data.isHost}<ClaimFields options={data.options} />{/if}
 				<label>Caption (optional) <input name="caption" maxlength="200" /></label>
 			{/snippet}
@@ -76,7 +103,7 @@
 					<details>
 						<summary>Edit</summary>
 						<div class="stack" style="margin-top:10px">
-							<PhotoEditor photo={p} code={data.game.code} options={data.options} claims={p.claims} categories={data.categories} canScore={data.isHost} also={data.also} />
+							<PhotoEditor photo={p} code={data.game.code} options={data.options} claims={p.claims} categories={data.categories} items={data.items} canScore={data.isHost} also={data.also} />
 						</div>
 					</details>
 				{/if}
@@ -92,6 +119,13 @@
 {/if}
 
 <style>
+	.checklist { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px 12px; }
+	.checklist li { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+	.checklist a { color: inherit; text-decoration: none; }
+	.checklist li.done a { color: var(--muted, inherit); text-decoration: line-through; }
+	.box { width: 20px; height: 20px; flex: none; border: 2px solid var(--line, #999); border-radius: 5px; display: grid; place-items: center; font-size: 13px; line-height: 1; }
+	.done .box { background: var(--team); border-color: var(--team); color: #fff; }
+	.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 	.ourrow { padding: 10px; margin: 0; display: grid; gap: 8px; }
 	.ourthumb { width: 84px; flex: none; }
 	summary { cursor: pointer; font-weight: 600; }
