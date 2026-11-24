@@ -49,12 +49,13 @@ POST   /api/v1/games/:code/reveal | unreveal
 GET    /api/v1/games/:code/scores
 GET|POST         /api/v1/games/:code/categories {name, points}
 PATCH|DELETE     /api/v1/games/:code/categories/:id   (PATCH: name, rules, notes, day_label, scoring_cap, max_points, active,
-                                                       options:[{id?, label, points, kind: tier|extra|bonus}])
+                                                       options:[{id?, label, points, kind: tier|extra|bonus},
+                                                       items:["label", ...]  (the checklist; replaces the list, ids are kept for unchanged labels)])
 GET|POST         /api/v1/games/:code/teams {name, color}
 PATCH|DELETE     /api/v1/games/:code/teams/:id
 GET|POST         /api/v1/games/:code/awards {name, description, points, scope}
 PATCH|DELETE     /api/v1/games/:code/awards/:id       (PATCH may set status: draft|open|closed)
-GET              /api/v1/games/:code/photos?category=&team=&status=&user=&limit=
+GET              /api/v1/games/:code/photos?category=&item=&team=&status=&user=&limit=
 PATCH|DELETE     /api/v1/games/:code/photos/:id       (PATCH: status ok|disqualified, points_override)
 GET|POST         /api/v1/games/:code/superlatives {title, kind: person|team|photo, user_id|team_id|photo_id, note?}
 DELETE           /api/v1/games/:code/superlatives/:id

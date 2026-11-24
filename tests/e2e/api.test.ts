@@ -135,6 +135,26 @@ describe('game management', () => {
 		expect(patched.options.map((o: any) => [o.label, o.kind])).toEqual([['Base', 'tier'], ['Per hat', 'extra'], ['Funny', 'bonus']]);
 		expect((await api(`games/${w.g.code}/categories/${made.id}`, t, { method: 'PATCH', body: { options: [{ label: 'Only extra', points: 1, kind: 'extra' }] } })).status).toBe(400);
 	});
+	it('replaces a category checklist and filters photos by item', async () => {
+		const w = await world();
+		const t = await key(w.host.id, ALL_GAME, w.g.id);
+		const url = `games/${w.g.code}/categories/${w.cat.id}`;
+		const set = async (items: unknown) => api(url, t, { method: 'PATCH', body: { items } });
+		const a = await json(await set(['Ohio', 'Iowa', ' ohio ', '']));
+		expect(a.items.map((i: any) => i.label)).toEqual(['Ohio', 'Iowa']);
+		const b = await json(await set(['Iowa', 'Utah']));
+		expect(b.items.map((i: any) => i.label)).toEqual(['Iowa', 'Utah']);
+		expect(b.items[0].id).toBe(a.items[1].id);
+		expect((await set(Array.from({ length: 501 }, (_, i) => `s${i}`))).status).toBe(400);
+		// A PATCH without `items` leaves the list alone.
+		const c = await json(await api(url, t, { method: 'PATCH', body: { name: 'Plates' } }));
+		expect(c.items.map((i: any) => i.label)).toEqual(['Iowa', 'Utah']);
+		const id = await photo(w.g, { cat: w.cat.id, team: w.tA, user: w.alice.id });
+		await exec('UPDATE photo SET item_id = ? WHERE id = ?', b.items[0].id, id);
+		const hit = await json(await api(`games/${w.g.code}/photos?item=${b.items[0].id}`, t));
+		expect(hit).toMatchObject([{ id, item: 'Iowa' }]);
+		expect(await json(await api(`games/${w.g.code}/photos?item=${b.items[1].id}`, t))).toEqual([]);
+	});
 	it('needs both scopes to delete a category, which takes its photos along', async () => {
 		const w = await world();
 		const id = await photo(w.g, { cat: w.cat.id, team: w.tA, user: w.alice.id });

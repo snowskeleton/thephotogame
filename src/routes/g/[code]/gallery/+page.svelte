@@ -20,10 +20,16 @@
 </div>
 
 <form bind:this={formEl} class="row" style="margin-bottom:12px;flex-wrap:wrap" data-sveltekit-keepfocus>
-	<select name="cat" onchange={() => formEl.requestSubmit()} aria-label="Category">
+	<select name="cat" onchange={() => { const item = formEl.elements.namedItem('item'); if (item instanceof HTMLSelectElement) item.value = ''; formEl.requestSubmit(); }} aria-label="Category">
 		<option value="">All categories</option>
 		{#each data.categories as c}<option value={c.id} selected={data.filter.cat === c.id}>{c.name}</option>{/each}
 	</select>
+	{#if data.items.length}
+		<select name="item" onchange={() => formEl.requestSubmit()} aria-label="Checklist item">
+			<option value="">All items</option>
+			{#each data.items as i}<option value={i.id} selected={data.filter.item === i.id}>{i.label}</option>{/each}
+		</select>
+	{/if}
 	<select name="team" onchange={() => formEl.requestSubmit()} aria-label="Team">
 		<option value="">All teams</option>
 		{#each data.teams as t}<option value={t.id} selected={data.filter.team === t.id}>{t.name}</option>{/each}

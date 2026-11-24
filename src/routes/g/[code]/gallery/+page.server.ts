@@ -1,11 +1,15 @@
 import { all } from '#lib/server/db.ts';
 import { enter } from '#lib/server/game.ts';
+import { itemsFor } from '#lib/server/items.ts';
 import { browseFilter, listPhotos } from '#lib/server/photos.ts';
 import { scoreGame } from '#lib/server/scoring.ts';
 
 export const load = async ({ params, locals, url }) => {
 	const { game, viewer } = await enter(locals, params.code);
 	const filter = browseFilter(url, viewer.isHost);
+	// The checklist filter only means something inside its own category.
+	const items = filter.cat ? await itemsFor(filter.cat) : [];
+	if (filter.item && !items.some((i) => i.id === filter.item)) filter.item = undefined;
 	// Hosts see each photo's scoring state and can filter to the ones that still need points.
 	const scores = viewer.isHost ? (await scoreGame(game)).photoScores : null;
 	const rows = await listPhotos(game, viewer, filter);
@@ -14,6 +18,7 @@ export const load = async ({ params, locals, url }) => {
 	const people = new Map(everything.map((p) => [p.user_id, p.who]));
 	return {
 		filter,
+		items,
 		photos: filter.unscored ? photos.filter((p) => p.score?.pending && p.status !== 'disqualified') : photos,
 		days: [...new Set(everything.map((p) => p.day))],
 		people: [...people].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)),

@@ -2,6 +2,7 @@ import { fail } from '@sveltejs/kit';
 import { all, batch, get, insert, now, q, run } from './db.ts';
 import { str, type Game, type Viewer } from './game.ts';
 import { claimStatements } from './claims.ts';
+import { itemIn } from './items.ts';
 import { remove, sniff, store } from './images.ts';
 import { settings } from './settings.ts';
 import { announce } from './webhooks.ts';
@@ -40,10 +41,11 @@ export async function savePhotos(game: Game, viewer: Viewer, f: FormData, catego
 	if (!ext || !jpeg(bytes.thumb) || !jpeg(bytes.large))
 		return fail(400, { added: 0, error: `“${original.name}” isn’t a photo we can read. Try a JPEG or PNG.` });
 
+	const itemId = category ? await itemIn(category.id, f.get('item')) : null;
 	const id = await insert(
-		`INSERT INTO photo (game_id, category_id, user_id, team_id, caption, ext, width, height, bytes, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		game.id, category?.id ?? null, viewer.user.id, viewer.teamId, str(f.get('caption'), 200),
+		`INSERT INTO photo (game_id, category_id, item_id, user_id, team_id, caption, ext, width, height, bytes, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		game.id, category?.id ?? null, itemId, viewer.user.id, viewer.teamId, str(f.get('caption'), 200),
 		ext, dim(f.get('width')), dim(f.get('height')),
 		bytes.original.byteLength + bytes.thumb.byteLength + bytes.large.byteLength, now()
 	);
@@ -76,7 +78,8 @@ async function full(gameId: number) {
 /** Moves a photo into a category. Claims belong to the old category's options, so they are cleared and the host scores it again. */
 export async function fileInto(photoId: number, categoryId: number, wasUnsorted: boolean) {
 	await batch([
-		q('UPDATE photo SET category_id = ? WHERE id = ?', categoryId, photoId),
+		// The checklist item belonged to the old category, so it is cleared along with the claims.
+		q('UPDATE photo SET category_id = ?, item_id = NULL WHERE id = ?', categoryId, photoId),
 		// "Submitted" means filed: in hidden mode a photo filed after a reveal waits for the next one.
 		...(wasUnsorted ? [q('UPDATE photo SET created_at = ? WHERE id = ?', now(), photoId)] : []),
 		q('DELETE FROM photo_claim WHERE photo_id = ?', photoId)

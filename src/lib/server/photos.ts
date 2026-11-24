@@ -6,6 +6,8 @@ export type PhotoRow = {
 	id: number;
 	category_id: number;
 	category: string;
+	item_id: number | null;
+	item: string | null;
 	team_id: number;
 	team: string;
 	color: string;
@@ -19,9 +21,9 @@ export type PhotoRow = {
 	day: string;
 };
 
-const SELECT = `SELECT p.id, p.category_id, c.name AS category, p.team_id, t.name AS team, t.color,
+const SELECT = `SELECT p.id, p.category_id, c.name AS category, p.item_id, ci.label AS item, p.team_id, t.name AS team, t.color,
 	p.user_id, u.name AS who, p.caption, p.status, p.width, p.height, p.created_at
-	FROM photo p JOIN category c ON c.id = p.category_id JOIN team t ON t.id = p.team_id
+	FROM photo p JOIN category c ON c.id = p.category_id LEFT JOIN category_item ci ON ci.id = p.item_id JOIN team t ON t.id = p.team_id
 	JOIN user u ON u.id = p.user_id`;
 
 // D1's "localtime" is UTC, so the calendar day is worked out here, in the game's time zone.
@@ -35,12 +37,13 @@ const withDay = (rows: Omit<PhotoRow, 'day'>[]): PhotoRow[] => rows.map((p) => (
 export async function listPhotos(
 	game: Game,
 	viewer: Viewer,
-	f: { cat?: number; team?: number; user?: number; day?: string; status?: string; oldestFirst?: boolean } = {}
+	f: { cat?: number; item?: number; team?: number; user?: number; day?: string; status?: string; oldestFirst?: boolean } = {}
 ): Promise<PhotoRow[]> {
 	const vis = visibleSql(game, viewer);
 	const where = ['p.game_id = ?', vis.sql];
 	const params: (number | string)[] = [game.id, ...vis.params];
 	if (f.cat) (where.push('p.category_id = ?'), params.push(f.cat));
+	if (f.item) (where.push('p.item_id = ?'), params.push(f.item));
 	if (f.team) (where.push('p.team_id = ?'), params.push(f.team));
 	if (f.user) (where.push('p.user_id = ?'), params.push(f.user));
 	if (f.status) (where.push('p.status = ?'), params.push(f.status));
@@ -59,6 +62,7 @@ export function browseFilter(url: URL, isHost: boolean): BrowseFilter {
 	const p = url.searchParams;
 	return {
 		cat: Number(p.get('cat')) || undefined,
+		item: Number(p.get('item')) || undefined,
 		team: Number(p.get('team')) || undefined,
 		user: Number(p.get('user')) || undefined,
 		day: p.get('day') || undefined,
