@@ -23,11 +23,15 @@
 {/if}
 
 {#each data.teams as t (t.id)}
+	{@const roster = data.players.filter((p) => p.team_id === t.id)}
 	<details class="card" style="{tv(t.color)};border-left:8px solid var(--team)">
 		<summary>
 			{t.name}
 			<span class="muted small">{t.members}{max ? `/${max}` : ''} players · <a href="/g/{data.game.code}/gallery?team={t.id}" onclick={(e) => e.stopPropagation()}>{t.photos} photos</a></span>
 			{#if max && t.members > max}<span class="pill warn">oversized</span>{/if}
+			<div class="muted small roster">
+				{#each roster as p, i (p.id)}{i ? ', ' : ''}{p.name}{#if p.status === 'invited'} (invited){/if}{:else}No players yet{/each}
+			</div>
 		</summary>
 		<form method="POST" action="?/saveTeam" class="stack" style="margin-top:12px" use:enhance>
 			<input type="hidden" name="id" value={t.id} />
@@ -113,6 +117,7 @@
 	.player { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
 	.player:last-child { border-bottom: 0; }
 	.player select { width: 130px; padding: 8px; }
+	.roster { margin-top: 4px; font-weight: normal; }
 	.more { flex-basis: auto; }
 	.more[open] { flex-basis: 100%; }
 	.more summary { list-style: none; padding: 4px 8px; }
