@@ -39,12 +39,14 @@ test('a host defines a checklist; players tick items off at upload and filter th
 	const second = await site.upload(world.alice.id, world.g.code, { category: world.dogs.id, seed: 5 });
 	await alice.goto(`/g/${world.g.code}/gallery`);
 	await expect(alice.getByLabel('Checklist item')).toHaveCount(0);
-	await alice.getByLabel('Category').selectOption({ label: 'Dogs' });
+	await alice.getByLabel('Category').selectOption({ label: '(2) Dogs' });
 	await expect(alice.locator('a.ph')).toHaveCount(2);
-	await alice.getByLabel('Checklist item').selectOption({ label: 'Poodle' });
+	await expect(alice.getByLabel('Checklist item').locator('option')).toHaveText(['All items', '(0) Beagle', '(1) Poodle', '(0) Corgi']);
+	await alice.getByLabel('Checklist item').selectOption({ label: '(1) Poodle' })
+;
 	await expect(alice).toHaveURL(new RegExp(`item=${poodle}`));
 	await expect(alice.locator('a.ph')).toHaveCount(1);
-	await alice.getByLabel('Category').selectOption({ label: 'Silly hats' });
+	await alice.getByLabel('Category').selectOption({ label: '(0) Silly hats' });
 	await expect(alice).not.toHaveURL(/item=\d/);
 
 	// Editing the photo's item from its page.

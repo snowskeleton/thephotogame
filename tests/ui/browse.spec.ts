@@ -19,14 +19,18 @@ test.describe('gallery', () => {
 		await expect(thumbs(page)).toHaveCount(4);
 		await expect.poll(() => page.evaluate(() => [...document.images].every((i) => i.complete && i.naturalWidth > 0))).toBe(true);
 
-		await page.getByLabel('Team').selectOption({ label: 'Blues' });
+		// Each option carries the number of photos it would show with the other filters applied.
+		await expect(page.getByLabel('Team').locator('option')).toHaveText(['All teams', '(3) Reds', '(1) Blues']);
+		await expect(page.getByLabel('Category').locator('option')).toHaveText(['All categories', '(3) Silly hats', '(1) Dogs']);
+		await page.getByLabel('Team').selectOption({ label: '(1) Blues' });
+		await expect(page.getByLabel('Category').locator('option')).toHaveText(['All categories', '(1) Silly hats', '(0) Dogs']);
 		await expect(page).toHaveURL(new RegExp(`team=${world.blues}`));
 		await expect(thumbs(page)).toHaveCount(1);
 
 		await page.getByLabel('Team').selectOption({ label: 'All teams' });
-		await page.getByLabel('Category').selectOption({ label: 'Dogs' });
+		await page.getByLabel('Category').selectOption({ label: '(1) Dogs' });
 		await expect(thumbs(page)).toHaveCount(1);
-		await page.getByLabel('Person').selectOption({ label: 'Bob' });
+		await page.getByLabel('Person').selectOption({ label: '(0) Bob' });
 		await expect(thumbs(page)).toHaveCount(0);
 		await expect(page.getByText('No photos here yet.')).toBeVisible();
 		await page.getByRole('link', { name: 'Clear filters' }).click();
