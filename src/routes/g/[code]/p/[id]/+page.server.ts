@@ -152,6 +152,17 @@ export const actions = {
 		await run('UPDATE photo SET caption = ? WHERE id = ?', str(f.get('caption'), 200), photo.id);
 		return { saved: true };
 	},
+	// One click for the host: files the photo's points as the edit form would show them untouched (first tier, no extras or bonuses).
+	approve: async (event) => {
+		const { viewer, photo } = await ctx(event);
+		if (!viewer.isHost) return fail(403, { error: 'Admins only' });
+		const tiers = (await optionsFor(photo.category_id)).filter((o) => o.kind === 'tier');
+		const f = new FormData();
+		if (tiers.length) f.set('tier', String(tiers[0].id));
+		await saveClaims(photo.id, photo.category_id, f);
+		announce('photo.scored', photo.id);
+		return { approved: true };
+	},
 	delete: async (event) => {
 		const { game, viewer, photo, mine } = await ctx(event);
 		if (!mine && !viewer.isHost) return fail(403, { error: 'Only the photographer can delete this.' });
