@@ -56,6 +56,23 @@ test.describe('gallery', () => {
 		await expect(thumbs(page)).toHaveCount(3);
 	});
 
+	test('stepping to the next photo refreshes the category and caption in the edit form', async ({ page, site, world }) => {
+		const ids = await gallery(site, world);
+		await site.signIn(page, world.alice.id);
+		await page.goto(`/g/${world.g.code}/gallery?team=${world.reds}`);
+		await thumbs(page).first().click();
+		await expect(page).toHaveURL(new RegExp(`/p/${ids.c}\\?`));
+		await page.waitForLoadState('networkidle');
+		await page.getByText('Edit photo').click();
+		await expect(page.locator('select[name=category]')).toHaveValue(String(world.dogs.id));
+		await expect(page.locator('input[name=caption]')).toHaveValue('A dog');
+		await page.getByRole('link', { name: /Older/ }).click();
+		await expect(page).toHaveURL(new RegExp(`/p/${ids.b}\\?`));
+		await page.getByText('Edit photo').click();
+		await expect(page.locator('select[name=category]')).toHaveValue(String(world.hats.id));
+		await expect(page.locator('input[name=caption]')).toHaveValue('A hat two');
+	});
+
 	test('the Back link on a photo returns to the same filtered list', async ({ page, site, world }) => {
 		const ids = await gallery(site, world);
 		await site.signIn(page, world.alice.id);
