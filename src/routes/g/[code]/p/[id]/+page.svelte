@@ -6,6 +6,7 @@
 	let { data, form } = $props();
 	const p = $derived(data.photo);
 	const base = $derived(`/g/${data.game.code}`);
+	const firstTier = $derived(data.options.find((o) => o.kind === 'tier'));
 	const canDoubt = $derived(!data.ours && !!data.team && p.status !== 'disqualified');
 </script>
 
@@ -25,6 +26,12 @@
 		<a class="pill" href="{base}/c/{id}" title="Earns points from this category's options">+ {name}</a>
 	{/each}
 </div>
+
+{#if data.isHost && data.score.pending && p.status === 'ok' && data.override == null}
+	<form method="POST" action="?/approve" style="margin-top:8px" use:enhance>
+		<button class="primary block">✓ Approve{firstTier ? ` (${pts(firstTier.points)} pt)` : ''}</button>
+	</form>
+{/if}
 
 {#if data.isNew}<p class="card ok" style="margin-top:8px">Got it! Your photo is in.</p>{/if}
 

@@ -81,6 +81,16 @@ test.describe('uploading and sorting', () => {
 });
 
 test.describe('the host scores photos', () => {
+	test('one-click Approve scores a pending photo with the default points', async ({ page, site, world }) => {
+		const id = await site.upload(world.alice.id, world.g.code, { category: world.hats.id, caption: 'Quick one' });
+		await site.signIn(page, world.host.id);
+		await page.goto(`/g/${world.g.code}/p/${id}`);
+		await page.getByRole('button', { name: /^✓ Approve/ }).click();
+		await expect(page.getByText('Found it').first()).toBeVisible();
+		await expect(page.getByRole('button', { name: /^✓ Approve/ })).toHaveCount(0);
+		expect(site.claims(world.g.id).map((c) => ({ option_id: c.option_id }))).toEqual([{ option_id: world.hats.option }]);
+	});
+
 	test('the host sets points and the team’s total, board and leaderboard follow', async ({ page, site, world, browser }) => {
 		const id = await site.upload(world.alice.id, world.g.code, { category: world.hats.id, caption: 'Big hat' });
 		// Alice sees it waiting for points.
