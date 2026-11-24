@@ -9,6 +9,8 @@
 	const canDoubt = $derived(!data.ours && !!data.team && p.status !== 'disqualified');
 </script>
 
+<!-- Newer/Older reuse this component, so key on the photo: local form state (category, caption, claims) must reset with it. -->
+{#key p.id}
 {#if data.nav}
 	<div class="spread small" style="gap:8px">
 		<a class="muted" href={data.nav.back}>← Gallery{data.nav.label ? `: ${data.nav.label}` : ''}</a>
@@ -144,6 +146,7 @@
 		<a class="btn" href="{base}/admin/awards?photo={p.id}#pencil">🏅 Pencil in an award for this photo</a>
 	</div>
 {/if}
+{/key}
 
 <style>
 	.frame { margin: 10px 0 14px; border-radius: 16px; overflow: hidden; border: 4px solid var(--team); background: #000; }
