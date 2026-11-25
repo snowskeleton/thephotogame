@@ -151,7 +151,7 @@ describe('photo scoring', () => {
 		// Four 8s add up to 32; the team's total for the category is clamped to 20.
 		const s = await scoreGame(await game(g.id));
 		expect(s.teams[0].photoPts).toBe(20);
-		expect(ids.map((i) => s.photoScores.get(i)!.points)).toEqual([8, 8, 8]);
+		expect(ids.map((i) => s.photoScores.get(i)!.points)).toEqual([8, 4, 0]);
 	});
 
 	it('points earned from another category use up that category’s scoring_cap', async () => {
@@ -169,6 +169,15 @@ describe('photo scoring', () => {
 		const p = await mkPhoto(g, { cat: here, team, user, override: 10 });
 		await claim(p, tc);
 		expect((await teamTotal(g.id, team)).photoPts).toBe(10);
+	});
+
+	it('a single photo worth more than max_points shows only max_points', async () => {
+		const { g, team, user, cat } = await setup({ max: 21 });
+		const p = await mkPhoto(g, { cat, team, user });
+		await claim(p, await mkOption(cat, 30));
+		const s = await scoreGame(await game(g.id));
+		expect(s.photoScores.get(p)).toMatchObject({ points: 21 });
+		expect(s.teams[0].photoPts).toBe(21);
 	});
 
 	it('applies caps per team, not across teams', async () => {
