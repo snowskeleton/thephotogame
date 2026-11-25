@@ -32,7 +32,7 @@
 
 {#if data.isHost && data.score.pending && p.status === 'ok' && data.override == null}
 	<form method="POST" action="?/approve" style="margin-top:8px" use:enhance>
-		<button class="primary block">✓ Approve{firstTier ? ` (${pts(firstTier.points)} pt)` : ''}</button>
+		<button class="primary block">{#if data.guesses.length}✓ Confirm the guess ({pts(data.score.guess)} pt){:else}✓ Approve{firstTier ? ` (${pts(firstTier.points)} pt)` : ''}{/if}</button>
 	</form>
 {/if}
 
@@ -75,8 +75,15 @@
 				{:else if !data.score.counted}Over this category's scoring limit
 				{:else}Points{/if}
 			</strong>
-			<strong>{pts(data.score.points)}{#if !data.score.counted && p.status !== 'disqualified'} <span class="muted small">(claims {pts(data.score.claimed)})</span>{/if}</strong>
+			{#if data.score.pending && p.status === 'ok'}
+				<strong>{data.score.guess ? `~${pts(data.score.guess)} guess` : '–'}</strong>
+			{:else}
+				<strong>{pts(data.score.points)}{#if data.score.over > 0 && p.status !== 'disqualified'} <span class="muted small">({pts(data.score.over)} over the limit)</span>{/if}</strong>
+			{/if}
 		</div>
+		{#if data.score.pending && p.status === 'ok' && data.score.guess && data.score.projected < data.score.guess}
+			<p class="muted small" style="margin:0">Category limits would trim that to {pts(data.score.projected)} if confirmed as guessed.</p>
+		{/if}
 		{#each data.grants as g}
 			<div class="spread small"><span>🏅 {g.team}: {g.title}</span>
 				<span class="row" style="gap:8px;flex-wrap:nowrap">
@@ -117,7 +124,7 @@
 	<details class="card">
 		<summary>Edit photo</summary>
 		<div class="stack" style="margin-top:12px">
-			<PhotoEditor photo={p} code={data.game.code} options={data.options} claims={data.claims} categories={data.categories} items={data.items} canScore={data.isHost} also={data.also} context={data.nav?.context ?? ''} />
+			<PhotoEditor photo={p} code={data.game.code} options={data.options} claims={data.isHost && data.score.pending && data.guesses.length ? data.guesses : data.isHost ? data.claims : data.guesses} categories={data.categories} items={data.items} canScore={data.isHost} guessing={!data.isHost && data.mine && data.score.pending} also={data.also} context={data.nav?.context ?? ''} />
 		</div>
 	</details>
 {/if}

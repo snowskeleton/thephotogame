@@ -52,15 +52,18 @@ test.describe('uploading and sorting', () => {
 		await expect(page.getByText('1 photo added.')).toBeVisible();
 		await expect(page.getByRole('heading', { name: "Your team's photos" })).toBeVisible();
 		expect(site.photos(world.g.id)[0]).toMatchObject({ category_id: world.dogs.id, caption: 'Rex' });
-		// A player's own points are never stored; the photo waits for the host.
+		// A player's own points are only a guess; the photo waits for the host.
 		expect(site.claims(world.g.id)).toEqual([]);
-		await expect(page.getByText('Awaiting points')).toBeVisible();
+		expect(site.all('SELECT g.option_id FROM photo_guess g JOIN photo p ON p.id = g.photo_id WHERE p.game_id = ?', world.g.id)).toEqual([{ option_id: world.dogs.option }]);
+		await expect(page.getByText('Awaiting the host')).toBeVisible();
 	});
 
 	test('a player can discard an unsorted photo after confirming', async ({ page, site, world }) => {
 		await site.upload(world.alice.id, world.g.code);
 		await site.signIn(page, world.alice.id);
 		await page.goto(`/g/${world.g.code}`);
+		// Before hydration the button is a plain form post and skips the confirm dialog.
+		await page.waitForLoadState('networkidle');
 		page.once('dialog', (d) => d.dismiss());
 		await page.getByRole('button', { name: 'Delete photo' }).click();
 		expect(site.photos(world.g.id)).toHaveLength(1);

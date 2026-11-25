@@ -28,13 +28,27 @@ export const load = async ({ params, locals, url }) => {
 		category.id,
 		viewer.teamId ?? -1
 	);
+	const guesses = await all<{ photo_id: number; option_id: number; qty: number }>(
+		`SELECT g.photo_id, g.option_id, g.qty FROM photo_guess g JOIN photo p ON p.id = g.photo_id
+		 WHERE p.category_id = ? AND p.team_id = ?`,
+		category.id,
+		viewer.teamId ?? -1
+	);
+	const pool = (await scoreGame(game)).pools.get(`${viewer.teamId}:${category.id}`) ?? { confirmed: 0, projected: 0, count: 0, projectedCount: 0 };
 	return {
+		pool,
 		category,
 		options: await optionsFor(category.id),
 		items: await itemsFor(category.id),
 		found: await foundItems(category.id, viewer.teamId),
-		also: viewer.isHost ? await otherOptionsFor(game.id, category.id) : [],
-		ours: ours.map((p) => ({ ...p, claims: claims.filter((c) => c.photo_id === p.id) })),
+		also: await otherOptionsFor(game.id, category.id),
+		ours: ours.map((p) => ({
+			...p,
+			// The host edits real claims (starting from the guess while unscored); the photographer edits the guess.
+			claims: viewer.isHost
+				? (p.score.pending && guesses.some((g) => g.photo_id === p.id) ? guesses : claims).filter((c) => c.photo_id === p.id)
+				: guesses.filter((g) => g.photo_id === p.id)
+		})),
 		theirs: photos.filter((p) => p.team_id !== viewer.teamId),
 		categories: await all<{ id: number; name: string }>(
 			'SELECT id, name FROM category WHERE game_id = ? AND (active = 1 OR ? OR id = ?) ORDER BY sort, id',

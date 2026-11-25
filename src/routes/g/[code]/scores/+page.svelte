@@ -18,7 +18,7 @@
 		<div class="card" style="{tv(t.color)};border-left:8px solid var(--team)">
 			<div class="spread">
 				<strong style="font-size:1.1rem">{medal(i)} {t.name}</strong>
-				<strong style="font-size:1.4rem">{pts(t.total)}</strong>
+				<strong style="font-size:1.4rem">{pts(t.total)}{#if t.pendingPts} <span class="muted small" style="font-weight:400">+{pts(t.pendingPts)} pending</span>{/if}</strong>
 			</div>
 			<div class="bar"><div style="width:{data.categoryCount ? (t.filled / data.categoryCount) * 100 : 0}%"></div></div>
 			<div class="row small muted" style="gap:6px 14px">
@@ -36,17 +36,31 @@
 {:else}
 	<div class="card">
 		<table>
-			<thead><tr><th>Player</th><th class="n">Photos</th><th class="n">Points</th></tr></thead>
+			<thead><tr><th>Player</th><th class="n">Photos</th><th class="n">Pending</th><th class="n">Points</th></tr></thead>
 			<tbody>
 				{#each data.people as p}
 					<tr style="{tv(p.color ?? 'var(--line)')}">
 						<td><span class="dot"></span> {p.name} <span class="muted small">{p.team ?? 'no team'}</span></td>
 						<td class="n">{p.photos}</td>
+						<td class="n muted">{p.pending ? `+${pts(p.pending)}` : ''}</td>
 						<td class="n"><strong>{pts(p.points)}</strong></td>
 					</tr>
 				{/each}
 			</tbody>
 		</table>
+	</div>
+{/if}
+
+{#if data.beyond.people.length || data.beyond.teams.length}
+	<h2 style="margin-top:20px">Above and beyond</h2>
+	<div class="card stack" data-testid="beyond">
+		<p class="muted small" style="margin:0">Points earned past a category limit. They don't count, but they're a lot of effort.</p>
+		{#each data.beyond.people as p}
+			<div class="spread" style="{tv(p.color ?? 'var(--line)')}"><span><span class="dot"></span> {p.name} <span class="muted small">{p.team ?? ''}</span></span><strong>+{pts(p.over)} over</strong></div>
+		{/each}
+		{#each data.beyond.teams as t}
+			<div class="spread" style="{tv(t.color)}"><span class="pill team">Team {t.name}</span><strong>+{pts(t.over)} over</strong></div>
+		{/each}
 	</div>
 {/if}
 

@@ -51,14 +51,17 @@ export const mkCategory = (gameId: number, o: { cap?: number | null; max?: numbe
 export const mkOption = (categoryId: number, points: number, kind: 'tier' | 'extra' | 'bonus' = 'tier') =>
 	insert('INSERT INTO score_option (category_id, label, points, kind) VALUES (?, ?, ?, ?)', categoryId, `${kind} ${points}`, points, kind);
 
-export const mkPhoto = (g: { id: number }, o: { cat: number | null; team: number; user: number; status?: string; override?: number | null }) =>
+export const mkPhoto = (g: { id: number }, o: { cat: number | null; team: number; user: number; status?: string; override?: number | null; at?: number }) =>
 	insert(
 		'INSERT INTO photo (game_id, category_id, user_id, team_id, ext, width, height, status, points_override, created_at) VALUES (?, ?, ?, ?, ?, 1, 1, ?, ?, ?)',
-		g.id, o.cat, o.user, o.team, 'jpg', o.status ?? 'ok', o.override ?? null, now()
+		g.id, o.cat, o.user, o.team, 'jpg', o.status ?? 'ok', o.override ?? null, o.at ?? now()
 	);
 
 export const claim = (photoId: number, optionId: number, qty = 1) =>
 	run('INSERT INTO photo_claim (photo_id, option_id, qty) VALUES (?, ?, ?)', photoId, optionId, qty);
+
+export const guess = (photoId: number, optionId: number, qty = 1) =>
+	run('INSERT INTO photo_guess (photo_id, option_id, qty) VALUES (?, ?, ?)', photoId, optionId, qty);
 
 export const teamTotal = async (gameId: number, teamId: number) =>
 	(await scoreGame(await game(gameId))).teams.find((t) => t.id === teamId)!;

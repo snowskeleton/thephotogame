@@ -1,7 +1,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { all, batch, get, run } from '#lib/server/db.ts';
 import { canSee, enter, num, str } from '#lib/server/game.ts';
-import { alsoStatements, optionsFor, otherOptionsFor, saveClaims } from '#lib/server/claims.ts';
+import { adoptGuess, alsoStatements, guessStatements, optionsFor, otherOptionsFor, saveClaims } from '#lib/server/claims.ts';
 import { remove } from '#lib/server/images.ts';
 import { giveTeamPoints } from '#lib/server/grants.ts';
 import { browseFilter, listPhotos, onePhoto } from '#lib/server/photos.ts';
@@ -52,6 +52,9 @@ async function browseNav(event: { url: URL }, game: Awaited<ReturnType<typeof ct
 	};
 }
 
+const isPending = async (id: number) =>
+	!(await get('SELECT 1 FROM photo WHERE id = ?1 AND (points_override IS NOT NULL OR EXISTS (SELECT 1 FROM photo_claim WHERE photo_id = ?1))', id));
+
 const doubtCount = async (id: number) => (await get<{ n: number }>('SELECT COUNT(*) AS n FROM doubt WHERE photo_id = ?', id))!.n;
 
 export const load = async (event) => {
@@ -69,7 +72,8 @@ export const load = async (event) => {
 			.points_override,
 		options: await optionsFor(photo.category_id),
 		items: await itemsFor(photo.category_id),
-		also: viewer.isHost ? await otherOptionsFor(game.id, photo.category_id) : [],
+		also: viewer.isHost || mine ? await otherOptionsFor(game.id, photo.category_id) : [],
+		guesses: mine || ours || viewer.isHost ? await all<{ option_id: number; qty: number }>('SELECT option_id, qty FROM photo_guess WHERE photo_id = ?', photo.id) : [],
 		claims: await all<{ option_id: number; qty: number; label: string; points: number; category: string; category_id: number }>(
 			`SELECT c.option_id, c.qty, o.label, o.points, o.category_id, cat.name AS category FROM photo_claim c
 			 JOIN score_option o ON o.id = c.option_id JOIN category cat ON cat.id = o.category_id
@@ -145,7 +149,10 @@ export const actions = {
 			await fileInto(photo.id, target.id, false);
 			return { saved: true, moved: target.name };
 		}
-		// Players keep their caption; points are assigned by the host only.
+		// Points are assigned by the host only. The photographer can say what they think it's worth until then.
+		if (!viewer.isHost && mine && (await isPending(photo.id))) {
+			await batch(await guessStatements(photo.id, game, photo.category_id, f));
+		}
 		if (viewer.isHost) {
 			await saveClaims(photo.id, photo.category_id, f);
 			// Only when the form had the "also" section, so other callers can't wipe these by omission.
@@ -161,6 +168,11 @@ export const actions = {
 	approve: async (event) => {
 		const { viewer, photo } = await ctx(event);
 		if (!viewer.isHost) return fail(403, { error: 'Admins only' });
+		// A photographer's guess is what gets confirmed, when there is one.
+		if (await adoptGuess(photo.id)) {
+			announce('photo.scored', photo.id);
+			return { approved: true };
+		}
 		const tiers = (await optionsFor(photo.category_id)).filter((o) => o.kind === 'tier');
 		const f = new FormData();
 		if (tiers.length) f.set('tier', String(tiers[0].id));

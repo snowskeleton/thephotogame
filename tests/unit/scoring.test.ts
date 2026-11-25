@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { bingoLines, scoreGame } from '../../src/lib/server/scoring.ts';
 import { get, insert, now, run } from '../../src/lib/server/db.ts';
-import { claim, game, mkCategory, mkGame, mkMember, mkOption, mkPhoto, mkTeam, mkUser, teamTotal, useDatabase } from './helpers.ts';
+import { claim, game, guess, mkCategory, mkGame, mkMember, mkOption, mkPhoto, mkTeam, mkUser, teamTotal, useDatabase } from './helpers.ts';
 
 useDatabase();
 
@@ -82,18 +82,19 @@ describe('photo scoring', () => {
 		expect((await teamTotal(g.id, team)).photoPts).toBe(0);
 	});
 
-	it('counts only the best photos up to scoring_cap', async () => {
+	it('counts only the first photos submitted up to scoring_cap', async () => {
 		const { g, team, user, cat } = await setup({ cap: 2 });
 		const ids = [];
 		for (const pts of [3, 9, 6]) {
 			const o = await mkOption(cat, pts);
-			const p = await mkPhoto(g, { cat, team, user });
+			const p = await mkPhoto(g, { cat, team, user, at: 1000 + ids.length });
 			await claim(p, o);
 			ids.push(p);
 		}
 		const s = await scoreGame(await game(g.id));
-		expect(s.teams[0].photoPts).toBe(9 + 6);
-		expect(s.photoScores.get(ids[0])!.counted).toBe(false);
+		expect(s.teams[0].photoPts).toBe(3 + 9);
+		expect(s.photoScores.get(ids[2])!.counted).toBe(false);
+		expect(s.photoScores.get(ids[2])!.over).toBe(6);
 	});
 
 	it('clamps the category total to max_points', async () => {
@@ -178,6 +179,101 @@ describe('photo scoring', () => {
 		const s = await scoreGame(await game(g.id));
 		expect(s.photoScores.get(p)).toMatchObject({ points: 21 });
 		expect(s.teams[0].photoPts).toBe(21);
+	});
+
+	it('lets a later photo fill only the room that is left', async () => {
+		const { g, team, user, cat } = await setup({ max: 10 });
+		const a = await mkPhoto(g, { cat, team, user, at: 1 });
+		await claim(a, await mkOption(cat, 5));
+		const b = await mkPhoto(g, { cat, team, user, at: 2 });
+		await claim(b, await mkOption(cat, 6));
+		const s = await scoreGame(await game(g.id));
+		expect(s.teams[0].photoPts).toBe(10);
+		expect(s.photoScores.get(b)).toMatchObject({ points: 5, over: 1, counted: true });
+		expect(s.photoScores.get(a)).toMatchObject({ points: 5, over: 0 });
+	});
+
+	it('never lets a later, higher photo take points from an earlier one', async () => {
+		const { g, team, user, cat } = await setup({ max: 10 });
+		const a = await mkPhoto(g, { cat, team, user, at: 1 });
+		await claim(a, await mkOption(cat, 3));
+		const b = await mkPhoto(g, { cat, team, user, at: 2 });
+		await claim(b, await mkOption(cat, 20));
+		const s = await scoreGame(await game(g.id));
+		expect(s.photoScores.get(a)!.points).toBe(3);
+		expect(s.photoScores.get(b)).toMatchObject({ points: 7, over: 13 });
+	});
+
+	it('goes by submission time, not by row id', async () => {
+		const { g, team, user, cat } = await setup({ max: 5 });
+		const late = await mkPhoto(g, { cat, team, user, at: 50 });
+		const early = await mkPhoto(g, { cat, team, user, at: 10 });
+		const o = await mkOption(cat, 5);
+		await claim(late, o);
+		await claim(early, o);
+		const s = await scoreGame(await game(g.id));
+		expect(s.photoScores.get(early)!.points).toBe(5);
+		expect(s.photoScores.get(late)!.points).toBe(0);
+	});
+
+	it('tracks overage per photo, player and team', async () => {
+		const { g, team, user, cat } = await setup({ max: 10 });
+		const other = await mkUser();
+		await mkMember(g.id, other, team);
+		const a = await mkPhoto(g, { cat, team, user, at: 1 });
+		await claim(a, await mkOption(cat, 8));
+		const b = await mkPhoto(g, { cat, team, user: other, at: 2 });
+		await claim(b, await mkOption(cat, 9));
+		const s = await scoreGame(await game(g.id));
+		expect(s.personOver.get(other)).toBe(7);
+		expect(s.personOver.get(user) ?? 0).toBe(0);
+		expect(s.teams[0].overPts).toBe(7);
+		expect(s.personPts.get(other)).toBe(2);
+	});
+
+	it('keeps guesses out of the official score and shows them as pending', async () => {
+		const { g, team, user, cat } = await setup();
+		const p = await mkPhoto(g, { cat, team, user });
+		await guess(p, await mkOption(cat, 7));
+		const s = await scoreGame(await game(g.id));
+		expect(s.teams[0]).toMatchObject({ photoPts: 0, pendingPts: 7, total: 0 });
+		expect(s.photoScores.get(p)).toMatchObject({ pending: true, guess: 7, projected: 7, points: 0 });
+		expect(s.personPending.get(user)).toBe(7);
+	});
+
+	it('projects pending guesses into the category room and tracks confirmed versus pending', async () => {
+		const { g, team, user, cat } = await setup({ max: 20 });
+		const done = await mkPhoto(g, { cat, team, user, at: 1 });
+		await claim(done, await mkOption(cat, 18));
+		const waiting = await mkPhoto(g, { cat, team, user, at: 2 });
+		await guess(waiting, await mkOption(cat, 32));
+		const s = await scoreGame(await game(g.id));
+		expect(s.pools.get(`${team}:${cat}`)).toMatchObject({ confirmed: 18, projected: 20 });
+		expect(s.teams[0]).toMatchObject({ photoPts: 18, pendingPts: 2 });
+		expect(s.photoScores.get(waiting)).toMatchObject({ guess: 32, projected: 2 });
+	});
+
+	it('counts a guess on another category’s option toward that category', async () => {
+		const { g, team, user, cat } = await setup();
+		const colors = await mkCategory(g.id, { max: 4, sort: 5 });
+		const bonus = await mkOption(colors, 3, 'bonus');
+		const a = await mkPhoto(g, { cat, team, user, at: 1 });
+		await claim(a, bonus);
+		const b = await mkPhoto(g, { cat, team, user, at: 2 });
+		await guess(b, bonus);
+		const s = await scoreGame(await game(g.id));
+		expect(s.pools.get(`${team}:${colors}`)).toMatchObject({ confirmed: 3, projected: 4 });
+		expect(s.photoScores.get(b)!.projected).toBe(1);
+	});
+
+	it('ignores guesses once the host has scored the photo', async () => {
+		const { g, team, user, cat } = await setup();
+		const p = await mkPhoto(g, { cat, team, user });
+		await guess(p, await mkOption(cat, 50));
+		await claim(p, await mkOption(cat, 2));
+		const s = await scoreGame(await game(g.id));
+		expect(s.photoScores.get(p)).toMatchObject({ pending: false, guess: 0, points: 2, projected: 2 });
+		expect(s.teams[0].pendingPts).toBe(0);
 	});
 
 	it('applies caps per team, not across teams', async () => {
