@@ -62,6 +62,8 @@ test.describe('uploading and sorting', () => {
 		await site.upload(world.alice.id, world.g.code);
 		await site.signIn(page, world.alice.id);
 		await page.goto(`/g/${world.g.code}`);
+		// Before hydration the button is a plain form post and skips the confirm dialog.
+		await page.waitForLoadState('networkidle');
 		page.once('dialog', (d) => d.dismiss());
 		await page.getByRole('button', { name: 'Delete photo' }).click();
 		expect(site.photos(world.g.id)).toHaveLength(1);
