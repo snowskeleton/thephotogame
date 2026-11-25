@@ -13,6 +13,7 @@
 		categories,
 		items = [],
 		canScore = false,
+		guessing = false,
 		also = [],
 		context = ''
 	}: {
@@ -25,6 +26,8 @@
 		items?: { id: number; label: string }[];
 		/** Only the host assigns points. */
 		canScore?: boolean;
+		/** The photographer's own estimate, open until the host scores the photo. */
+		guessing?: boolean;
 		/** Options from the game's other categories the host can also credit this photo with. */
 		also?: (Option & { category: string })[];
 		/** Query string of the list this photo was opened from ("?from=gallery&…"); kept when the photo is deleted. */
@@ -74,7 +77,8 @@
 	{/if}
 	{#if moving}
 		<p class="muted small" style="margin:0">Moving clears the photo's points. The host sets them again.</p>
-	{:else if canScore}
+	{:else if canScore || guessing}
+		{#if guessing}<p class="muted small" style="margin:0">What do you think this earns? The host confirms or changes it.</p>{/if}
 		<ClaimFields {options} {claims} />
 		<AlsoFields options={also} {claims} />
 	{/if}

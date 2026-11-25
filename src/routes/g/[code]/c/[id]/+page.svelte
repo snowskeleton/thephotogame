@@ -3,11 +3,21 @@
 	import { tv } from '#lib/colors.ts';
 	import Thumb from '#lib/components/Thumb.svelte';
 	import ClaimFields from '#lib/components/ClaimFields.svelte';
+	import AlsoFields from '#lib/components/AlsoFields.svelte';
 	import Uploader from '#lib/components/Uploader.svelte';
 	import PhotoEditor from '#lib/components/PhotoEditor.svelte';
 	let { data, form } = $props();
 	const open = $derived(data.game.submissions_open && data.category.active);
 	const foundSet = $derived(new Set(data.found));
+	const pendingPts = $derived(Math.max(0, data.pool.projected - data.pool.confirmed));
+	const fullNow = $derived(
+		(!!data.category.max_points && data.pool.confirmed >= data.category.max_points) ||
+			(!!data.category.scoring_cap && data.pool.count >= data.category.scoring_cap)
+	);
+	const fullSoon = $derived(
+		(!!data.category.max_points && data.pool.projected >= data.category.max_points) ||
+			(!!data.category.scoring_cap && data.pool.projectedCount >= data.category.scoring_cap)
+	);
 	const canEdit = (p: { user_id: number }) => p.user_id === data.user?.id || data.isHost;
 </script>
 
@@ -28,10 +38,10 @@
 		</div>
 	{/if}
 	{#if data.category.scoring_cap}
-		<p class="muted small" style="margin:0">Only your team's best {plural(data.category.scoring_cap, 'photo')} here score points. Every photo can still win votes.</p>
+		<p class="muted small" style="margin:0">Only your team's first {plural(data.category.scoring_cap, 'photo')} here score points. Every photo can still win votes.</p>
 	{/if}
 	{#if data.category.max_points}
-		<p class="muted small" style="margin:0">A team can count at most {pts(data.category.max_points)} pts here. Points past that don't count.</p>
+		<p class="muted small" style="margin:0">A team can count at most {pts(data.category.max_points)} pts here. Photos fill it in the order they're submitted, and a photo that doesn't fit entirely earns what room is left.</p>
 	{/if}
 	{#if data.category.notes}<p class="muted small" style="white-space:pre-wrap;margin:0">{data.category.notes}</p>{/if}
 </div>
@@ -57,6 +67,14 @@
 {#if data.team && open}
 	<div class="card stack" style="border-color:var(--team);border-width:2px">
 		<h2 style="margin:0">Add photos here</h2>
+		{#if data.category.max_points || data.category.scoring_cap}
+			<p class="small" style="margin:0" data-testid="room">
+				{#if data.category.max_points}Your team: {pts(data.pool.confirmed)} of {pts(data.category.max_points)} pts confirmed{pendingPts ? `, ${pts(pendingPts)} pending` : ''}.{/if}
+				{#if data.category.scoring_cap}{data.category.max_points ? ' ' : 'Your team: '}{data.pool.count} of {data.category.scoring_cap} photos confirmed{data.pool.projectedCount > data.pool.count ? `, ${data.pool.projectedCount - data.pool.count} pending` : ''}.{/if}
+				{#if fullNow}<strong> Full. New photos won't earn points here.</strong>
+				{:else if fullSoon}<strong> Pending photos already fill it, so a new one probably won't earn points.</strong>{/if}
+			</p>
+		{/if}
 		<Uploader>
 			{#snippet fields()}
 				{#if data.items.length}
@@ -67,7 +85,13 @@
 						</select>
 					</label>
 				{/if}
-				{#if data.isHost}<ClaimFields options={data.options} />{/if}
+				{#if data.isHost}
+					<ClaimFields options={data.options} />
+				{:else}
+					<p class="muted small" style="margin:0">What do you think this earns? The host confirms or changes it.</p>
+					<ClaimFields options={data.options} />
+					<AlsoFields options={data.also} />
+				{/if}
 				<label>Caption (optional) <input name="caption" maxlength="200" /></label>
 			{/snippet}
 		</Uploader>
@@ -93,9 +117,10 @@
 						<div class="muted small">
 							{#if p.status === 'disqualified'}Disqualified
 							{:else if p.status === 'review'}Under review
-							{:else if p.score.pending}Awaiting points
-							{:else if p.score.counted}{pts(p.score.points)} pt
-							{:else}Over the scoring limit{/if}
+							{:else if p.score.pending}Awaiting the host{#if p.score.guess} · guess ~{pts(p.score.guess)} pt{/if}
+							{:else if p.score.points > 0}{pts(p.score.points)} pt{#if p.score.over > 0} ({pts(p.score.over)} over the limit){/if}
+							{:else if p.score.over > 0}Over the scoring limit
+							{:else}{pts(p.score.points)} pt{/if}
 						</div>
 					</div>
 				</div>

@@ -138,6 +138,30 @@ describe('scoring is the host’s call', () => {
 		expect(await sql('SELECT * FROM photo_claim')).toEqual([]);
 		expect((await one('SELECT caption FROM photo WHERE id = ?', w.id))!.caption).toBe('hello');
 	});
+	it('keeps the photographer’s points as a guess that the host can confirm', async () => {
+		const w = await filed();
+		await post(P(w.g, w.id, 'claims'), claim(w), { cookie: w.cookie.alice });
+		expect(await sql('SELECT option_id FROM photo_guess')).toEqual([{ option_id: w.cat.option }]);
+		expect(await sql('SELECT * FROM photo_claim')).toEqual([]);
+		await post(P(w.g, w.id, 'approve'), {}, { cookie: w.cookie.host });
+		expect(await sql('SELECT option_id FROM photo_claim')).toEqual([{ option_id: w.cat.option }]);
+	});
+	it('stops taking guesses once the host has scored the photo, and from other players', async () => {
+		const w = await filed();
+		await exec('UPDATE game SET visibility = ? WHERE id = ?', 'open', w.g.id);
+		await post(P(w.g, w.id, 'claims'), claim(w), { cookie: w.cookie.bob });
+		expect(await sql('SELECT * FROM photo_guess')).toEqual([]);
+		await post(P(w.g, w.id, 'claims'), claim(w), { cookie: w.cookie.host });
+		await post(P(w.g, w.id, 'claims'), claim(w), { cookie: w.cookie.alice });
+		expect(await sql('SELECT * FROM photo_guess')).toEqual([]);
+	});
+	it('files a player’s upload with their guess', async () => {
+		const w = await world();
+		const files = { photo: jpeg(), thumb: jpeg('t.jpg'), large: jpeg('l.jpg'), width: '8', height: '6', tier: String(w.cat.option) };
+		await post(`/g/${w.g.code}/c/${w.cat.id}`, files, { cookie: w.cookie.alice });
+		expect(await sql('SELECT option_id FROM photo_guess')).toEqual([{ option_id: w.cat.option }]);
+		expect(await sql('SELECT * FROM photo_claim')).toEqual([]);
+	});
 	it('stores a host’s claim and the team’s score follows', async () => {
 		const w = await filed();
 		await post(P(w.g, w.id, 'claims'), claim(w), { cookie: w.cookie.host });

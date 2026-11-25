@@ -2,7 +2,14 @@ import { all, get, q } from './db.ts';
 import type { Game } from './game.ts';
 
 /** `pending` means the host hasn't assigned points yet. */
-export type PhotoScore = { claimed: number; points: number; counted: boolean; pending: boolean };
+/**
+ * `claimed`/`points`/`counted` are the host-confirmed result. `guess` is the photographer's own estimate while
+ * the photo awaits the host, `projected` what the photo would earn if every guess were confirmed, and `over`
+ * how many confirmed points were lost to a category limit.
+ */
+export type PhotoScore = { claimed: number; points: number; counted: boolean; pending: boolean; guess: number; projected: number; over: number };
+/** One team's standing in one category: confirmed points and what they would be with every pending guess confirmed. */
+export type Pool = { confirmed: number; projected: number; count: number; projectedCount: number };
 export type TeamScore = {
 	id: number;
 	name: string;
@@ -15,6 +22,10 @@ export type TeamScore = {
 	bingoPts: number;
 	awardPts: number;
 	grantPts: number;
+	/** Photo points still waiting on the host, from players' guesses. Not part of `total`. */
+	pendingPts: number;
+	/** Confirmed points lost to category limits. */
+	overPts: number;
 	total: number;
 };
 export type Winner = {
@@ -69,81 +80,129 @@ async function computeScores(game: Game) {
 	}>(
 		`SELECT p.id, p.category_id, p.team_id, p.user_id, p.status, p.points_override,
 			(SELECT COUNT(*) FROM photo_claim c WHERE c.photo_id = p.id) AS has_claim
-		 FROM photo p WHERE p.game_id = ? AND p.category_id IS NOT NULL`,
+		 FROM photo p WHERE p.game_id = ? AND p.category_id IS NOT NULL ORDER BY p.created_at, p.id`,
 		game.id
 	);
-	// What each photo claimed, per category the options belong to (its own category and any it also earns from).
-	const claimRows = await all<{ photo_id: number; category_id: number; v: number }>(
-		`SELECT c.photo_id, o.category_id, SUM(o.points * c.qty) AS v
-		 FROM photo_claim c JOIN score_option o ON o.id = c.option_id JOIN photo p ON p.id = c.photo_id
-		 WHERE p.game_id = ? GROUP BY c.photo_id, o.category_id`,
-		game.id
-	);
-	const claimsOf = new Map<number, Map<number, number>>();
-	for (const r of claimRows) {
-		if (!claimsOf.has(r.photo_id)) claimsOf.set(r.photo_id, new Map());
-		claimsOf.get(r.photo_id)!.set(r.category_id, r.v);
-	}
+	type Totals = Map<number, Map<number, number>>;
+	const totalsOf = async (table: 'photo_claim' | 'photo_guess'): Promise<Totals> => {
+		// What each photo claimed, per category the options belong to (its own category and any it also earns from).
+		const rows = await all<{ photo_id: number; category_id: number; v: number }>(
+			`SELECT c.photo_id, o.category_id, SUM(o.points * c.qty) AS v
+			 FROM ${table} c JOIN score_option o ON o.id = c.option_id JOIN photo p ON p.id = c.photo_id
+			 WHERE p.game_id = ? GROUP BY c.photo_id, o.category_id`,
+			game.id
+		);
+		const out: Totals = new Map();
+		for (const r of rows) {
+			if (!out.has(r.photo_id)) out.set(r.photo_id, new Map());
+			out.get(r.photo_id)!.set(r.category_id, r.v);
+		}
+		return out;
+	};
+	const claimsOf = await totalsOf('photo_claim');
+	const guessOf = await totalsOf('photo_guess');
+	const sumOf = (m?: Map<number, number>) => [...(m?.values() ?? [])].reduce((a, b) => a + b, 0);
 
 	const capOf = new Map(cats.map((c) => [c.id, c.scoring_cap]));
 	const maxOf = new Map(cats.map((c) => [c.id, c.max_points]));
-	const photoScores = new Map<number, PhotoScore>();
-	const teamPhotoPts = new Map<number, number>();
-	const teamPhotos = new Map<number, number>();
-	const filled = new Map<number, Set<number>>();
-	const personPts = new Map<number, number>();
-	const personPhotos = new Map<number, number>();
-	const give = (p: { id: number; team_id: number; user_id: number }, pts: number) => {
-		photoScores.get(p.id)!.points += pts;
-		teamPhotoPts.set(p.team_id, (teamPhotoPts.get(p.team_id) ?? 0) + pts);
-		personPts.set(p.user_id, (personPts.get(p.user_id) ?? 0) + pts);
-	};
+	type P = (typeof photos)[number];
+	type Entry = { photo: P; cat: number; value: number; own: boolean };
+	const confirmed = (p: P) => p.points_override != null || p.has_claim > 0;
 
-	// A category's limits apply per team to everything that scores in it: photos filed there, plus photos from
-	// other categories that also earned points from its options (those count as one photo each, at the points
-	// they earned from this category). A host override replaces a photo's whole score, so it never stacks.
-	type Entry = { photo: (typeof photos)[number]; value: number; own: boolean };
-	const pools = new Map<string, Entry[]>();
+	/**
+	 * Settles every entry in submission order, first come first served. A category limit is per team and covers
+	 * everything that scores in it: photos filed there, plus photos from other categories that also earned points
+	 * from its options (one entry each, at the points earned from this category). A later entry only fills what
+	 * room is left (a 6 into 5 left earns 5), and the rest is its overage. A host override replaces a photo's
+	 * whole score, so it only ever sits in the photo's own category.
+	 */
+	const settle = (entries: Entry[]) => {
+		const photoPts = new Map<number, number>();
+		const photoOver = new Map<number, number>();
+		const counted = new Set<number>();
+		const teamPts = new Map<number, number>();
+		const personPts = new Map<number, number>();
+		const pools = new Map<string, { total: number; count: number }>();
+		for (const e of entries) {
+			const { photo: p } = e;
+			let pts = e.value;
+			if (capOf.has(e.cat)) {
+				const k = `${p.team_id}:${e.cat}`;
+				const pool = pools.get(k) ?? { total: 0, count: 0 };
+				pools.set(k, pool);
+				const cap = capOf.get(e.cat);
+				const max = maxOf.get(e.cat);
+				pts = cap && pool.count >= cap ? 0 : Math.max(0, max ? Math.min(e.value, max - pool.total) : e.value);
+				if (e.value > 0 && pts > 0) pool.count++;
+				pool.total += pts;
+			}
+			if (e.own && (pts > 0 || e.value <= 0)) counted.add(p.id);
+			photoPts.set(p.id, (photoPts.get(p.id) ?? 0) + pts);
+			photoOver.set(p.id, (photoOver.get(p.id) ?? 0) + (e.value - pts));
+			teamPts.set(p.team_id, (teamPts.get(p.team_id) ?? 0) + pts);
+			personPts.set(p.user_id, (personPts.get(p.user_id) ?? 0) + pts);
+		}
+		return { photoPts, photoOver, counted, teamPts, personPts, pools };
+	};
+	const entriesFor = (p: P, byCat: Map<number, number> | undefined, override: number | null): Entry[] => {
+		if (override != null) return [{ photo: p, cat: p.category_id, value: override, own: true }];
+		const out: Entry[] = [{ photo: p, cat: p.category_id, value: byCat?.get(p.category_id) ?? 0, own: true }];
+		for (const [cat, value] of byCat ?? []) if (cat !== p.category_id) out.push({ photo: p, cat, value, own: false });
+		return out;
+	};
+	const live = photos.filter((p) => p.status === 'ok' && capOf.has(p.category_id));
+	const confirmedEntries = live.filter(confirmed).flatMap((p) => entriesFor(p, claimsOf.get(p.id), p.points_override));
+	// Projected: the same, with every unconfirmed photo that has a guess slotted in at its own submission time.
+	const later = live.flatMap((p) =>
+		confirmed(p) ? entriesFor(p, claimsOf.get(p.id), p.points_override) : guessOf.has(p.id) ? entriesFor(p, guessOf.get(p.id), null) : []
+	);
+	const real = settle(confirmedEntries);
+	const proj = settle(later);
+
+	const photoScores = new Map<number, PhotoScore>();
+	const teamPhotos = new Map<number, number>();
+	const personPhotos = new Map<number, number>();
+	const filled = new Map<number, Set<number>>();
+	const teamOver = new Map<number, number>();
+	const personOver = new Map<number, number>();
 	for (const p of photos) {
-		const total = p.points_override ?? [...(claimsOf.get(p.id)?.values() ?? [])].reduce((a, b) => a + b, 0);
-		photoScores.set(p.id, { claimed: total, points: 0, counted: false, pending: p.points_override == null && !p.has_claim });
+		const done = confirmed(p);
+		photoScores.set(p.id, {
+			claimed: p.points_override ?? sumOf(claimsOf.get(p.id)),
+			points: real.photoPts.get(p.id) ?? 0,
+			counted: real.counted.has(p.id),
+			pending: !done,
+			guess: done ? 0 : sumOf(guessOf.get(p.id)),
+			projected: proj.photoPts.get(p.id) ?? 0,
+			over: real.photoOver.get(p.id) ?? 0
+		});
 		teamPhotos.set(p.team_id, (teamPhotos.get(p.team_id) ?? 0) + 1);
 		personPhotos.set(p.user_id, (personPhotos.get(p.user_id) ?? 0) + 1);
-		if (p.status !== 'ok' || !capOf.has(p.category_id)) continue;
-		const add = (cat: number, e: Entry) => {
-			const k = `${p.team_id}:${cat}`;
-			if (!pools.has(k)) pools.set(k, []);
-			pools.get(k)!.push(e);
-		};
-		add(p.category_id, { photo: p, value: p.points_override ?? claimsOf.get(p.id)?.get(p.category_id) ?? 0, own: true });
-		if (p.points_override != null) continue;
-		for (const [cat, v] of claimsOf.get(p.id) ?? []) {
-			if (cat === p.category_id) continue;
-			if (capOf.has(cat)) add(cat, { photo: p, value: v, own: false });
-			else give(p, v);
+		const o = real.photoOver.get(p.id) ?? 0;
+		if (o) {
+			teamOver.set(p.team_id, (teamOver.get(p.team_id) ?? 0) + o);
+			personOver.set(p.user_id, (personOver.get(p.user_id) ?? 0) + o);
+		}
+		// A square is filled by any good photo filed there, scored or not.
+		if (p.status === 'ok' && capOf.has(p.category_id)) {
+			if (!filled.has(p.team_id)) filled.set(p.team_id, new Set());
+			filled.get(p.team_id)!.add(p.category_id);
 		}
 	}
-	for (const [k, list] of pools) {
-		const cat = Number(k.split(':')[1]);
-		const cap = capOf.get(cat);
-		const max = maxOf.get(cat);
-		// Points add up as normal. The photo cap keeps the best N entries. The point ceiling is handed out best
-		// first, so each photo shows what it really earned and the photos still add up to the team's total.
-		list.sort((a, b) => b.value - a.value || a.photo.id - b.photo.id);
-		const kept = cap ? list.slice(0, cap) : list;
-		let left = max ? max : Infinity;
-		for (const e of kept) {
-			const pts = Math.max(0, Math.min(e.value, left));
-			left -= pts;
-			if (e.own) photoScores.get(e.photo.id)!.counted = pts > 0 || e.value === 0;
-			give(e.photo, pts);
-		}
-		const own = list.find((e) => e.own);
-		if (own) {
-			if (!filled.has(own.photo.team_id)) filled.set(own.photo.team_id, new Set());
-			filled.get(own.photo.team_id)!.add(cat);
-		}
-	}
+	const teamPhotoPts = real.teamPts;
+	const personPts = real.personPts;
+	const teamPending = new Map<number, number>();
+	const personPending = new Map<number, number>();
+	for (const [t, v] of proj.teamPts) teamPending.set(t, Math.max(0, v - (real.teamPts.get(t) ?? 0)));
+	for (const [u, v] of proj.personPts) personPending.set(u, Math.max(0, v - (real.personPts.get(u) ?? 0)));
+	const poolState = new Map<string, Pool>();
+	for (const k of new Set([...real.pools.keys(), ...proj.pools.keys()]))
+		poolState.set(k, {
+			confirmed: real.pools.get(k)?.total ?? 0,
+			projected: proj.pools.get(k)?.total ?? 0,
+			count: real.pools.get(k)?.count ?? 0,
+			projectedCount: proj.pools.get(k)?.count ?? 0
+		});
 
 	// Voted awards: results only exist once voting is closed.
 	const awards = await all<{ id: number; points: number; scope: string }>(
@@ -204,12 +263,14 @@ async function computeScores(game: Game) {
 			bingoPts,
 			awardPts,
 			grantPts,
+			pendingPts: teamPending.get(t.id) ?? 0,
+			overPts: teamOver.get(t.id) ?? 0,
 			total: photoPts + bingoPts + awardPts + grantPts
 		};
 	});
 	scores.sort((a, b) => b.total - a.total || b.filled - a.filled || a.name.localeCompare(b.name));
 
-	return { teams: scores, photoScores, winners, filled, personPts, personPhotos, categoryCount: cats.length };
+	return { teams: scores, photoScores, winners, filled, personPts, personPhotos, personPending, personOver, pools: poolState, categoryCount: cats.length };
 }
 
 type Scores = Awaited<ReturnType<typeof computeScores>>;
@@ -221,7 +282,10 @@ const pack = (s: Scores) =>
 		photoScores: [...s.photoScores],
 		filled: [...s.filled].map(([k, v]) => [k, [...v]]),
 		personPts: [...s.personPts],
-		personPhotos: [...s.personPhotos]
+		personPhotos: [...s.personPhotos],
+		personPending: [...s.personPending],
+		personOver: [...s.personOver],
+		pools: [...s.pools]
 	});
 const unpack = (json: string): Scores => {
 	const s = JSON.parse(json);
@@ -230,7 +294,10 @@ const unpack = (json: string): Scores => {
 		photoScores: new Map(s.photoScores),
 		filled: new Map(s.filled.map(([k, v]: [number, number[]]) => [k, new Set(v)])),
 		personPts: new Map(s.personPts),
-		personPhotos: new Map(s.personPhotos)
+		personPhotos: new Map(s.personPhotos),
+		personPending: new Map(s.personPending),
+		personOver: new Map(s.personOver),
+		pools: new Map(s.pools)
 	};
 };
 

@@ -39,8 +39,13 @@ The Photo Game: a mobile website for family photo scavenger hunts. Product rules
 - **D1 is async and has no BEGIN/COMMIT.** Writes that must happen together go through `batch()`.
 - **Migrations:** add a new numbered file. Use `IF NOT EXISTS`. `migrate.ts` strips `--` comments and splits on `;`, so
   no semicolons inside strings or comments. A `CREATE TRIGGER ... BEGIN ... END` is kept whole.
-- **Players are untrusted.** Only hosts (`viewer.isHost`: game host or site admin) set points. A player's claim is never
-  stored. Enforce on the server first, then hide the UI.
+- **Players are untrusted.** Only hosts (`viewer.isHost`: game host or site admin) set points. A player's claim is stored
+  only as a guess (`photo_guess`), which never scores; it feeds the "pending" totals and the host's Confirm button.
+  Enforce on the server first, then hide the UI.
+- **Category limits** (`scoring_cap`, `max_points`) are per team per category and first come first served by
+  `photo.created_at`. A later photo only fills the room left; the rest is its overage (`PhotoScore.over`). Photos
+  from other categories that also earn points from a category's options draw from that category's room. `scoreGame`
+  settles twice: confirmed photos only (official), and confirmed plus guesses (`projected`, `pendingPts`, `pools`).
 - **Scoring cache:** `scoreGame` reads `score_cache`, valid while its epoch equals `game.score_epoch`. Triggers in
   migration 0009 bump the epoch on writes to scoring tables. A new scoring table needs triggers too.
 - **A new score option kind** must be added to `claims.ts`, `ClaimFields.svelte`, the admin category form and server,

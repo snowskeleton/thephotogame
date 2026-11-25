@@ -1,7 +1,7 @@
 import { fail } from '@sveltejs/kit';
 import { all, batch, get, insert, now, q, run } from './db.ts';
 import { str, type Game, type Viewer } from './game.ts';
-import { claimStatements } from './claims.ts';
+import { claimStatements, guessStatements } from './claims.ts';
 import { itemIn } from './items.ts';
 import { remove, sniff, store } from './images.ts';
 import { settings } from './settings.ts';
@@ -56,8 +56,9 @@ export async function savePhotos(game: Game, viewer: Viewer, f: FormData, catego
 		await remove([{ id, ext }]);
 		return fail(400, { added: 0, error: `“${original.name}” couldn’t be saved. Try it again.` });
 	}
-	// Points are the host's call; a player's own claim is never stored.
+	// Points are the host's call. A player's own claim is kept only as a guess, which feeds the pending totals.
 	if (category && viewer.isHost) await batch(await claimStatements(id, category.id, f));
+	else if (category) await batch(await guessStatements(id, game, category.id, f));
 	announce('photo.added', id);
 	if (category && viewer.isHost) announce('photo.scored', id);
 	return { added: 1 };
@@ -75,14 +76,15 @@ async function full(gameId: number) {
 	return !g.admin && maxPhotos > 0 && g.n >= maxPhotos;
 }
 
-/** Moves a photo into a category. Claims belong to the old category's options, so they are cleared and the host scores it again. */
+/** Moves a photo into a category. Claims and guesses belong to the old category's options, so they are cleared and the host scores it again. */
 export async function fileInto(photoId: number, categoryId: number, wasUnsorted: boolean) {
 	await batch([
 		// The checklist item belonged to the old category, so it is cleared along with the claims.
 		q('UPDATE photo SET category_id = ?, item_id = NULL WHERE id = ?', categoryId, photoId),
 		// "Submitted" means filed: in hidden mode a photo filed after a reveal waits for the next one.
 		...(wasUnsorted ? [q('UPDATE photo SET created_at = ? WHERE id = ?', now(), photoId)] : []),
-		q('DELETE FROM photo_claim WHERE photo_id = ?', photoId)
+		q('DELETE FROM photo_claim WHERE photo_id = ?', photoId),
+		q('DELETE FROM photo_guess WHERE photo_id = ?', photoId)
 	]);
 	announce('photo.filed', photoId);
 }

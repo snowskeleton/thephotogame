@@ -49,7 +49,7 @@
 	</div>
 {:else if data.score}
 	<div class="card spread" style="border-color:var(--team);border-width:2px">
-		<div><div class="muted small">Your team has</div><strong style="font-size:1.5rem">{pts(data.score.total)} pts</strong></div>
+		<div><div class="muted small">Your team has</div><strong style="font-size:1.5rem">{pts(data.score.total)} pts</strong>{#if data.score.pendingPts} <span class="muted small">+{pts(data.score.pendingPts)} pending</span>{/if}</div>
 		<div style="text-align:right" class="small">
 			{data.score.filled} of {data.categories.length} found
 			{#if data.game.bingo}<br />{plural(data.score.lines, 'bingo line')}{/if}

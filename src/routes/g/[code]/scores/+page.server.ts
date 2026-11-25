@@ -11,7 +11,7 @@ export const load = async ({ params, locals, url }) => {
 		 LEFT JOIN team t ON t.id = m.team_id WHERE m.game_id = ?`,
 		game.id
 	))
-		.map((p) => ({ ...p, points: s.personPts.get(p.id) ?? 0, photos: s.personPhotos.get(p.id) ?? 0 }))
+		.map((p) => ({ ...p, points: s.personPts.get(p.id) ?? 0, pending: s.personPending.get(p.id) ?? 0, over: s.personOver.get(p.id) ?? 0, photos: s.personPhotos.get(p.id) ?? 0 }))
 		.sort((a, b) => b.points - a.points || b.photos - a.photos || a.name.localeCompare(b.name));
 
 	const awards = await all<{ id: number; name: string; points: number; scope: string }>(
@@ -50,7 +50,13 @@ export const load = async ({ params, locals, url }) => {
 		.filter((x) => x.kind !== 'photo' || canSee(game, viewer, { team_id: x.photo_team_id!, created_at: x.photo_created_at! }))
 		.map((x) => ({ id: x.id, title: x.title, note: x.note, kind: x.kind, who: x.who, team: x.team, color: x.color, photo: x.photo_id ? { id: x.photo_id, color: x.color ?? '', status: x.photo_status ?? 'ok' } : null }));
 
+	// Who piled up the most points past a category limit, for the fun of it.
+	const beyond = {
+		people: people.filter((p) => p.over > 0).sort((a, b) => b.over - a.over).slice(0, 5),
+		teams: s.teams.filter((t) => t.overPts > 0).sort((a, b) => b.overPts - a.overPts).slice(0, 5).map((t) => ({ id: t.id, name: t.name, color: t.color, over: t.overPts }))
+	};
 	return {
+		beyond,
 		superlatives,
 		teams: s.teams,
 		categoryCount: s.categoryCount,
