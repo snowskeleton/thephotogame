@@ -93,8 +93,9 @@
 	<DownloadAll code={g.code} />
 	<hr />
 	<h3 style="margin:0">Export a subset</h3>
-	<p class="muted small" style="margin:0">Winners are photos that won a closed vote (ties included), in a folder per award. Disqualified photos are left out.</p>
+	<p class="muted small" style="margin:0">Winners are photos that won a closed vote (ties included). Any vote is every photo with at least one vote, open or closed. Both use a folder per award. Disqualified photos are left out.</p>
 	<DownloadAll code={g.code} set="winners" label="⬇ Winning photos ({data.winners})" disabled={!data.winners} />
+	<DownloadAll code={g.code} set="voted" label="⬇ Photos with any vote ({data.voted})" disabled={!data.voted} />
 	<DownloadAll code={g.code} set="superlatives" label="⬇ Photos with a superlative ({data.superlativePhotos})" disabled={!data.superlativePhotos} />
 	<label>One team
 		<select bind:value={exportTeam}>

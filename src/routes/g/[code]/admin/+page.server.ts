@@ -21,6 +21,7 @@ export const load = async ({ params, url }) => {
 		teams: await all<{ id: number; name: string }>('SELECT id, name FROM team WHERE game_id = ? ORDER BY name', game.id),
 		categories: await all<{ id: number; name: string }>('SELECT id, name FROM category WHERE game_id = ? ORDER BY sort, id', game.id),
 		winners: (await exportFiles(game, { kind: 'winners', id: 0 })).files.length,
+		voted: (await exportFiles(game, { kind: 'voted', id: 0 })).files.length,
 		superlativePhotos: (await exportFiles(game, { kind: 'superlatives', id: 0 })).files.length
 	};
 };

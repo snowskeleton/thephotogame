@@ -20,6 +20,8 @@ describe('export subsets', () => {
 		expect(body.files.map((f) => f.url)).toEqual([`/media/${p1}/original`]);
 		expect(body.files[0].name.startsWith('Best/')).toBe(true);
 
+		const v = (await (await get(`${url}?set=voted`, { cookie: w.cookie.host })).json()) as { files: { url: string }[] };
+		expect(v.files.map((f) => f.url)).toEqual([`/media/${p1}/original`]);
 		expect((await get(`${url}?set=nonsense`, { cookie: w.cookie.host })).status).toBe(400);
 		expect((await get(`${url}?set=team:999999`, { cookie: w.cookie.host })).status).toBe(404);
 		expect(((await (await get(url, { cookie: w.cookie.host })).json()) as any).files).toHaveLength(2);

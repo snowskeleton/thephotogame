@@ -24,6 +24,7 @@ async function world(status = 'closed') {
 describe('parseSet', () => {
 	it('accepts known sets and rejects the rest', () => {
 		expect(parseSet(null)).toEqual({ kind: 'all', id: 0 });
+		expect(parseSet('voted')).toEqual({ kind: 'voted', id: 0 });
 		expect(parseSet('winners')).toEqual({ kind: 'winners', id: 0 });
 		expect(parseSet('team:4')).toEqual({ kind: 'team', id: 4 });
 		expect(parseSet('team')).toBeNull();
@@ -56,6 +57,15 @@ describe('exportFiles', () => {
 		await run("UPDATE award SET scope = 'category'");
 		const { files } = await exportFiles(w.g, { kind: 'winners', id: 0 });
 		expect(files[0].folder).toBe('BestPhoto - Cat');
+	});
+	it('voted: any photo with a vote, even while voting is open and for non-winners', async () => {
+		const w = await world('open');
+		await run('INSERT INTO vote (award_id, photo_id, user_id) VALUES ((SELECT MAX(id) FROM award), ?, ?)', w.p2, await mkUser());
+		const { files } = await exportFiles(w.g, { kind: 'voted', id: 0 });
+		expect(files.map((f) => f.id).sort()).toEqual([w.p1, w.p2].sort());
+		expect(files[0].folder).toBe('BestPhoto');
+		await run("UPDATE photo SET status = 'disqualified' WHERE id = ?", w.p2);
+		expect((await exportFiles(w.g, { kind: 'voted', id: 0 })).files.map((f) => f.id)).toEqual([w.p1]);
 	});
 	it('superlatives: photos given a photo superlative', async () => {
 		const w = await world();

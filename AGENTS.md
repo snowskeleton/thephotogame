@@ -29,7 +29,7 @@ The Photo Game: a mobile website for family photo scavenger hunts. Product rules
   `grants.ts`, `game.ts` (viewer, host checks, visibility), `perms.ts` (API keys), `auth.ts`, `uploads.ts`, `images.ts`,
   `log.ts`, `migrate.ts`, `webhooks.ts` (outgoing webhooks: Ember threads, signed JSON), `superlatives.ts` (host-given titles),
   `items.ts` (category checklists: `category_item` rows, `photo.item_id`).
-  `exports.ts` (photo subsets for the admin zip: all, winners, superlatives, team, category).
+  `exports.ts` (photo subsets for the admin zip: all, winners, voted, voted, superlatives, team, category).
 - `src/lib/` browser code and shared helpers (`resize.ts` makes thumbnails in the browser, `browse.ts` gallery filters).
 - `migrations/NNNN_name.sql` the schema. The app applies new files itself on the first request each Worker instance
   serves and records them in `d1_migrations`. There is no migrate step.

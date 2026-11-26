@@ -7,9 +7,9 @@ export type ExportFile = { id: number; ext: string; folder: string; team: string
 const safe = (s: string) => s.replace(/[\\/:*?"<>|\x00-\x1f]/g, '').trim().slice(0, 60) || 'untitled';
 
 /** Which subset of photos to export. `team:<id>` and `category:<id>` carry an id. */
-export function parseSet(raw: string | null): { kind: 'all' | 'winners' | 'superlatives' | 'team' | 'category'; id: number } | null {
+export function parseSet(raw: string | null): { kind: 'all' | 'winners' | 'voted' | 'superlatives' | 'team' | 'category'; id: number } | null {
 	const [kind, id] = (raw ?? 'all').split(':');
-	if (kind === 'all' || kind === 'winners' || kind === 'superlatives') return { kind, id: 0 };
+	if (kind === 'all' || kind === 'winners' || kind === 'voted' || kind === 'superlatives') return { kind, id: 0 };
 	if ((kind === 'team' || kind === 'category') && Number(id) > 0) return { kind, id: Number(id) };
 	return null;
 }
@@ -40,6 +40,18 @@ export async function exportFiles(game: Game, set: NonNullable<ReturnType<typeof
 			game.id
 		);
 		return { label: 'superlatives', files: rows.map((r) => ({ ...r, folder: safe(r.title) })) };
+	}
+	if (set.kind === 'voted') {
+		// Any vote counts, whatever the award's status. A photo with votes in two awards lands in both folders.
+		const rows = await all<Row & { award: string }>(
+			`SELECT p.id, p.ext, c.name AS category, t.name AS team, u.name AS who, a.name AS award
+			 FROM photo p JOIN category c ON c.id = p.category_id JOIN team t ON t.id = p.team_id JOIN user u ON u.id = p.user_id
+			 JOIN award a ON a.game_id = p.game_id
+			 WHERE p.game_id = ? AND p.status != 'disqualified' AND EXISTS (SELECT 1 FROM vote v WHERE v.award_id = a.id AND v.photo_id = p.id)
+			 ORDER BY a.sort, a.id, p.id`,
+			game.id
+		);
+		return { label: 'voted', files: rows.map((r) => ({ ...r, folder: safe(r.award) })) };
 	}
 	const { winners } = await scoreGame(game);
 	if (!winners.length) return { label: 'winners', files: [] };

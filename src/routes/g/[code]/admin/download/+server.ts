@@ -6,7 +6,7 @@ import { get } from '#lib/server/db.ts';
 /**
  * The list of originals and their names inside the zip. The admin page fetches each one and builds the
  * zip in the browser: zipping hundreds of MB would blow through a Worker's CPU limit.
- * `?set=` picks the subset: all (default), winners, superlatives, team:<id>, category:<id>.
+ * `?set=` picks the subset: all (default), winners, voted, superlatives, team:<id>, category:<id>.
  */
 export const GET = async ({ params, locals, url }) => {
 	const game = await requireHost(locals, params.code);
