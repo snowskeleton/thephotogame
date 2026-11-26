@@ -4,6 +4,7 @@ import { get, now, run } from '#lib/server/db.ts';
 import { cleanCode, gameByCode, intOrNull, num, randomCode, requireHost, str } from '#lib/server/game.ts';
 import { remove } from '#lib/server/images.ts';
 import { all } from '#lib/server/db.ts';
+import { exportFiles } from '#lib/server/exports.ts';
 
 export const load = async ({ params, url }) => {
 	const game = await gameByCode(params.code);
@@ -15,7 +16,12 @@ export const load = async ({ params, url }) => {
 			`SELECT COUNT(*) AS photos, COALESCE(SUM(created_at > ?), 0) AS hidden FROM photo WHERE game_id = ? AND category_id IS NOT NULL`,
 			game.revealed_at,
 			game.id
-		))!
+		))!,
+		// Subsets the host can export (see lib/server/exports.ts).
+		teams: await all<{ id: number; name: string }>('SELECT id, name FROM team WHERE game_id = ? ORDER BY name', game.id),
+		categories: await all<{ id: number; name: string }>('SELECT id, name FROM category WHERE game_id = ? ORDER BY sort, id', game.id),
+		winners: (await exportFiles(game, { kind: 'winners', id: 0 })).files.length,
+		superlativePhotos: (await exportFiles(game, { kind: 'superlatives', id: 0 })).files.length
 	};
 };
 

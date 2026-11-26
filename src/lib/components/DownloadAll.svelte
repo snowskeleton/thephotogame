@@ -1,8 +1,8 @@
 <script lang="ts">
-	// Builds the zip of every original in the browser (see admin/download/+server.ts for why).
+	// Builds the zip of originals (the whole game or a subset) in the browser (see admin/download/+server.ts for why).
 	import { downloadZip } from 'client-zip';
 
-	let { code }: { code: string } = $props();
+	let { code, set = 'all', label = '⬇ Download all', disabled = false }: { code: string; set?: string; label?: string; disabled?: boolean } = $props();
 	let busy = $state(false);
 	let done = $state(0);
 	let total = $state(0);
@@ -14,7 +14,7 @@
 		done = 0;
 		try {
 			const list: { zip: string; files: { url: string; name: string }[] } = await (
-				await fetch(`/g/${code}/admin/download`)
+				await fetch(`/g/${code}/admin/download?set=${encodeURIComponent(set)}`)
 			).json();
 			total = list.files.length;
 			async function* files() {
@@ -37,8 +37,8 @@
 	}
 </script>
 
-<button class="btn" onclick={go} disabled={busy}>
-	{busy ? `Zipping ${Math.min(done + 1, total)} of ${total}…` : '⬇ Download all'}
+<button class="btn" onclick={go} disabled={busy || disabled}>
+	{busy ? `Zipping ${Math.min(done + 1, total)} of ${total}…` : label}
 </button>
 {#if busy && total}<progress max={total} value={done}></progress>{/if}
 {#if err}<p class="err small" style="margin:0">{err}</p>{/if}

@@ -8,6 +8,8 @@
 	const g = $derived(data.game);
 	// svelte-ignore state_referenced_locally
 	let bingo = $state(!!data.game.bingo);
+	let exportTeam = $state('');
+	let exportCat = $state('');
 </script>
 
 <h1>Game settings</h1>
@@ -89,6 +91,25 @@
 	<h2 style="margin:0">Keep the photos</h2>
 	<p class="muted small" style="margin:0">A zip of all {plural(data.stats.photos, 'original photo')}, in a folder per category.</p>
 	<DownloadAll code={g.code} />
+	<hr />
+	<h3 style="margin:0">Export a subset</h3>
+	<p class="muted small" style="margin:0">Winners are photos that won a closed vote (ties included), in a folder per award. Disqualified photos are left out.</p>
+	<DownloadAll code={g.code} set="winners" label="⬇ Winning photos ({data.winners})" disabled={!data.winners} />
+	<DownloadAll code={g.code} set="superlatives" label="⬇ Photos with a superlative ({data.superlativePhotos})" disabled={!data.superlativePhotos} />
+	<label>One team
+		<select bind:value={exportTeam}>
+			<option value="">Choose a team…</option>
+			{#each data.teams as t (t.id)}<option value={t.id}>{t.name}</option>{/each}
+		</select>
+	</label>
+	{#if exportTeam}{#key exportTeam}<DownloadAll code={g.code} set={`team:${exportTeam}`} label="⬇ Download team" />{/key}{/if}
+	<label>One category
+		<select bind:value={exportCat}>
+			<option value="">Choose a category…</option>
+			{#each data.categories as c (c.id)}<option value={c.id}>{c.name}</option>{/each}
+		</select>
+	</label>
+	{#if exportCat}{#key exportCat}<DownloadAll code={g.code} set={`category:${exportCat}`} label="⬇ Download category" />{/key}{/if}
 </div>
 
 <details class="card">
