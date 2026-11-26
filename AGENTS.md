@@ -51,6 +51,7 @@ The Photo Game: a mobile website for family photo scavenger hunts. Product rules
   migration 0009 bump the epoch on writes to scoring tables. A new scoring table needs triggers too.
 - **A new score option kind** must be added to `claims.ts`, `ClaimFields.svelte`, the admin category form and server,
   the API option parser, and `docs/API.md`.
+- **The `set` gallery filter** (winners, voted, superlatives) is resolved by `setIds` in `photos.ts`; `voted` is host-only because open votes are secret.
 - **A new gallery filter** goes into `browseFilter` (`photos.ts`), `browseQuery` (`browse.ts`), the gallery select and the
   slideshow loader together, or it silently resets. Keep navigation state in the URL, not component state.
 - **Webhooks:** call `announce(event, photoId)` from `webhooks.ts` after any write that should be reported (it runs after the

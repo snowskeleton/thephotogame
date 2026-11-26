@@ -1,7 +1,8 @@
 import { all } from '#lib/server/db.ts';
 import { enter } from '#lib/server/game.ts';
 import { itemsFor } from '#lib/server/items.ts';
-import { browseFilter, listPhotos } from '#lib/server/photos.ts';
+import { SET_LABEL, type BrowseSet } from '#lib/browse.ts';
+import { browseFilter, listPhotos, setIds } from '#lib/server/photos.ts';
 import { scoreGame } from '#lib/server/scoring.ts';
 
 export const load = async ({ params, locals, url }) => {
@@ -15,6 +16,8 @@ export const load = async ({ params, locals, url }) => {
 	const rows = await listPhotos(game, viewer, filter);
 	const photos = rows.map((p) => ({ ...p, score: scores?.get(p.id) }));
 	const everything = await listPhotos(game, viewer);
+	const setKinds = (['winners', ...(viewer.isHost ? ['voted'] : []), 'superlatives'] as BrowseSet[]);
+	const sets = new Map(await Promise.all(setKinds.map(async (k) => [k, await setIds(game, k)] as const)));
 	const people = new Map(everything.map((p) => [p.user_id, p.who]));
 	// Each dropdown's counts apply every other active filter, so "(0) Poodle" means none in the current view.
 	const dims = {
@@ -23,6 +26,7 @@ export const load = async ({ params, locals, url }) => {
 		team: (p: (typeof everything)[number]) => !filter.team || p.team_id === filter.team,
 		user: (p: (typeof everything)[number]) => !filter.user || p.user_id === filter.user,
 		day: (p: (typeof everything)[number]) => !filter.day || p.day === filter.day,
+		set: (p: (typeof everything)[number]) => !filter.set || sets.get(filter.set)!.has(p.id),
 		unscored: (p: (typeof everything)[number]) =>
 			!filter.unscored || (scores?.get(p.id)?.pending === true && p.status !== 'disqualified')
 	};
@@ -35,9 +39,14 @@ export const load = async ({ params, locals, url }) => {
 			return [skip, n];
 		})
 	) as Record<'cat' | 'item' | 'team' | 'user' | 'day', Record<string, number>>;
+	// Counts for the subset dropdown apply every other filter.
+	const setCounts = Object.fromEntries(
+		setKinds.map((k) => [k, everything.filter((p) => Object.entries(dims).every(([d, fn]) => d === 'set' || fn(p)) && sets.get(k)!.has(p.id)).length])
+	);
 	return {
 		filter,
 		counts,
+		setOptions: setKinds.map((k) => ({ value: k, label: SET_LABEL[k], n: setCounts[k] })),
 		items,
 		photos: filter.unscored ? photos.filter((p) => p.score?.pending && p.status !== 'disqualified') : photos,
 		days: [...new Set(everything.map((p) => p.day))],

@@ -1,5 +1,6 @@
 import { all, config } from './db.ts';
-import type { BrowseFilter } from '../browse.ts';
+import { BROWSE_SETS, type BrowseFilter, type BrowseSet } from '../browse.ts';
+import { scoreGame } from './scoring.ts';
 import { visibleSql, type Game, type Viewer } from './game.ts';
 
 export type PhotoRow = {
@@ -34,10 +35,20 @@ export function dayOf(ms: number): string {
 }
 const withDay = (rows: Omit<PhotoRow, 'day'>[]): PhotoRow[] => rows.map((p) => ({ ...p, day: dayOf(p.created_at) }));
 
+/** Ids of the photos in a subset (winners, any vote, superlatives), before visibility rules are applied. */
+export async function setIds(game: Game, set: BrowseSet): Promise<Set<number>> {
+	if (set === 'winners') return new Set((await scoreGame(game)).winners.map((w) => w.photo_id));
+	const rows =
+		set === 'voted'
+			? await all<{ id: number }>('SELECT DISTINCT v.photo_id AS id FROM vote v JOIN award a ON a.id = v.award_id WHERE a.game_id = ?', game.id)
+			: await all<{ id: number }>("SELECT photo_id AS id FROM superlative WHERE game_id = ? AND kind = 'photo'", game.id);
+	return new Set(rows.map((r) => r.id));
+}
+
 export async function listPhotos(
 	game: Game,
 	viewer: Viewer,
-	f: { cat?: number; item?: number; team?: number; user?: number; day?: string; status?: string; oldestFirst?: boolean } = {}
+	f: { cat?: number; item?: number; team?: number; user?: number; day?: string; set?: BrowseSet; status?: string; oldestFirst?: boolean } = {}
 ): Promise<PhotoRow[]> {
 	const vis = visibleSql(game, viewer);
 	const where = ['p.game_id = ?', vis.sql];
@@ -50,7 +61,8 @@ export async function listPhotos(
 	const rows = withDay(
 		await all(`${SELECT} WHERE ${where.join(' AND ')} ORDER BY p.created_at ${f.oldestFirst ? 'ASC' : 'DESC'}`, ...params)
 	);
-	return f.day ? rows.filter((p) => p.day === f.day) : rows;
+	const inSet = f.set ? await setIds(game, f.set) : null;
+	return rows.filter((p) => (!f.day || p.day === f.day) && (!inSet || inSet.has(p.id)));
 }
 
 export async function onePhoto(gameId: number, id: number): Promise<PhotoRow | undefined> {
@@ -66,6 +78,8 @@ export function browseFilter(url: URL, isHost: boolean): BrowseFilter {
 		team: Number(p.get('team')) || undefined,
 		user: Number(p.get('user')) || undefined,
 		day: p.get('day') || undefined,
-		unscored: isHost && p.get('unscored') === '1'
+		unscored: isHost && p.get('unscored') === '1',
+		// Open votes are secret, so only hosts may list every photo that received one.
+		set: BROWSE_SETS.find((s) => s === p.get('set') && (s !== 'voted' || isHost))
 	};
 }
