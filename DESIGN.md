@@ -179,7 +179,7 @@ team color), **Category** (rules, scoring, upload, edit your team's photos), **G
 **Vote**, **Scores** (teams, people, awards), **Account**.
 
 Admin: **Game** settings (visibility, reveal, team mode, max team size, doubt
-limit, bingo, submissions open/closed, download all), **Categories**,
+limit, bingo, submissions open/closed, download all or a subset: winners, superlatives, one team, one category), **Categories**,
 **Awards**, **Teams & players**, and site-wide **Users** and **Games**.
 
 ## Uploading

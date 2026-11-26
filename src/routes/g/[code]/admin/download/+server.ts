@@ -1,26 +1,31 @@
-import { json } from '@sveltejs/kit';
-import { gameByCode, requireHost } from '#lib/server/game.ts';
-import { all } from '#lib/server/db.ts';
-
-const safe = (s: string) => s.replace(/[\\/:*?"<>|\x00-\x1f]/g, '').trim().slice(0, 60) || 'untitled';
+import { error, json } from '@sveltejs/kit';
+import { requireHost } from '#lib/server/game.ts';
+import { exportFiles, fileName, parseSet, safe } from '#lib/server/exports.ts';
+import { get } from '#lib/server/db.ts';
 
 /**
  * The list of originals and their names inside the zip. The admin page fetches each one and builds the
  * zip in the browser: zipping hundreds of MB would blow through a Worker's CPU limit.
+ * `?set=` picks the subset: all (default), winners, superlatives, team:<id>, category:<id>.
  */
-export const GET = async ({ params, locals }) => {
+export const GET = async ({ params, locals, url }) => {
 	const game = await requireHost(locals, params.code);
-	const photos = await all<{ id: number; ext: string; category: string; team: string; who: string }>(
-		`SELECT p.id, p.ext, c.name AS category, t.name AS team, u.name AS who
-		 FROM photo p JOIN category c ON c.id = p.category_id JOIN team t ON t.id = p.team_id
-		 JOIN user u ON u.id = p.user_id WHERE p.game_id = ? ORDER BY c.sort, p.id`,
-		game.id
-	);
+	const set = parseSet(url.searchParams.get('set'));
+	if (!set) error(400, 'Unknown set');
+	const { files } = await exportFiles(game, set);
+	let suffix = '';
+	if (set.kind !== 'all') {
+		const label =
+			set.kind === 'team'
+				? (await get<{ name: string }>('SELECT name FROM team WHERE id = ? AND game_id = ?', set.id, game.id))?.name
+				: set.kind === 'category'
+					? (await get<{ name: string }>('SELECT name FROM category WHERE id = ? AND game_id = ?', set.id, game.id))?.name
+					: set.kind;
+		if (!label) error(404, 'Not found');
+		suffix = ` - ${label}`;
+	}
 	return json({
-		zip: `${safe(game.name)}.zip`,
-		files: photos.map((p) => ({
-			url: `/media/${p.id}/original`,
-			name: `${safe(p.category)}/${safe(p.team)} - ${safe(p.who)} - ${p.id}.${p.ext}`
-		}))
+		zip: `${safe(game.name + suffix)}.zip`,
+		files: files.map((f) => ({ url: `/media/${f.id}/original`, name: fileName(f) }))
 	});
 };
