@@ -9,7 +9,7 @@
 	}: {
 		/** Hosts see which photos still need points. */
 		showScore?: boolean;
-		photo: { id: number; color: string; status?: string; caption?: string; score?: { pending: boolean; points: number; counted: boolean } };
+		photo: { id: number; color: string; status?: string; caption?: string; score?: { pending: boolean; points: number; counted: boolean }; awardVotes?: { award_id: number; name: string; n: number }[] };
 		code: string;
 		tag?: string;
 		/** Query string for the photo page (see fromGallery), so it can offer Next/Back within this list. */
@@ -19,6 +19,7 @@
 
 <a class="ph" class:off={photo.status === 'disqualified'} href="/g/{code}/p/{photo.id}{context}" style="{tv(photo.color)}">
 	<img src="/media/{photo.id}/thumb" alt={photo.caption || 'Photo'} loading="lazy" />
+	{#if photo.awardVotes?.length}<span class="votes">{#each photo.awardVotes as v}<span class="tag" title="{v.name}: {v.n}">🗳️ {v.name} · {v.n}</span>{/each}</span>{/if}
 	{#if photo.status === 'review'}<span class="tag">⚠️ review</span>
 	{:else if photo.status === 'disqualified'}<span class="tag">✖ out</span>
 	{:else if showScore && photo.score?.pending}<span class="tag unscored">⏳ unscored</span>

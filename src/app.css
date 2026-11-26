@@ -152,6 +152,8 @@ button:disabled { opacity: 0.5; cursor: default; }
 	background: rgba(0, 0, 0, 0.66); color: #fff;
 	font-size: 0.72rem; font-weight: 700; padding: 1px 7px; border-radius: 999px;
 }
+.ph .votes { position: absolute; left: 4px; top: 4px; right: 4px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.ph .votes .tag { position: static; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: rgba(30, 64, 175, 0.85); }
 .ph .tag.unscored { background: #b45309; }
 .ph .tag.scored { background: rgba(22, 101, 52, 0.85); }
 .ph.off img { filter: grayscale(1); opacity: 0.5; }

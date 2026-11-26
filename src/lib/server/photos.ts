@@ -45,10 +45,37 @@ export async function setIds(game: Game, set: BrowseSet): Promise<Set<number>> {
 	return new Set(rows.map((r) => r.id));
 }
 
+export type VoteTally = { award_id: number; name: string; n: number };
+
+/**
+ * Votes per photo and per award. Open votes are secret, so players only see closed awards;
+ * hosts see every award that is not a draft.
+ */
+export async function voteCounts(game: Game, viewer: Viewer): Promise<Map<number, VoteTally[]>> {
+	const rows = await all<VoteTally & { photo_id: number }>(
+		`SELECT v.photo_id, a.id AS award_id, a.name, COUNT(*) AS n FROM vote v JOIN award a ON a.id = v.award_id
+		 WHERE a.game_id = ? AND a.status != 'draft' AND (a.status = 'closed' OR ?)
+		 GROUP BY v.photo_id, a.id ORDER BY a.sort, a.id`,
+		game.id,
+		viewer.isHost ? 1 : 0
+	);
+	const out = new Map<number, VoteTally[]>();
+	for (const { photo_id, ...t } of rows) out.set(photo_id, [...(out.get(photo_id) ?? []), t]);
+	return out;
+}
+
+/** The awards a viewer may see votes for, in display order. */
+export const votedAwards = (game: Game, viewer: Viewer) =>
+	all<{ id: number; name: string }>(
+		"SELECT id, name FROM award WHERE game_id = ? AND status != 'draft' AND (status = 'closed' OR ?) ORDER BY sort, id",
+		game.id,
+		viewer.isHost ? 1 : 0
+	);
+
 export async function listPhotos(
 	game: Game,
 	viewer: Viewer,
-	f: { cat?: number; item?: number; team?: number; user?: number; day?: string; set?: BrowseSet; status?: string; oldestFirst?: boolean } = {}
+	f: { cat?: number; item?: number; team?: number; user?: number; day?: string; set?: BrowseSet; award?: number; status?: string; oldestFirst?: boolean } = {}
 ): Promise<PhotoRow[]> {
 	const vis = visibleSql(game, viewer);
 	const where = ['p.game_id = ?', vis.sql];
@@ -62,7 +89,12 @@ export async function listPhotos(
 		await all(`${SELECT} WHERE ${where.join(' AND ')} ORDER BY p.created_at ${f.oldestFirst ? 'ASC' : 'DESC'}`, ...params)
 	);
 	const inSet = f.set ? await setIds(game, f.set) : null;
-	return rows.filter((p) => (!f.day || p.day === f.day) && (!inSet || inSet.has(p.id)));
+	let inAward: Set<number> | null = null;
+	if (f.award) {
+		const votes = await voteCounts(game, viewer);
+		inAward = new Set([...votes].filter(([, t]) => t.some((x) => x.award_id === f.award)).map(([id]) => id));
+	}
+	return rows.filter((p) => (!f.day || p.day === f.day) && (!inSet || inSet.has(p.id)) && (!inAward || inAward.has(p.id)));
 }
 
 export async function onePhoto(gameId: number, id: number): Promise<PhotoRow | undefined> {
@@ -79,6 +111,7 @@ export function browseFilter(url: URL, isHost: boolean): BrowseFilter {
 		user: Number(p.get('user')) || undefined,
 		day: p.get('day') || undefined,
 		unscored: isHost && p.get('unscored') === '1',
+		award: Number(p.get('award')) || undefined,
 		// Open votes are secret, so only hosts may list every photo that received one.
 		set: BROWSE_SETS.find((s) => s === p.get('set') && (s !== 'voted' || isHost))
 	};

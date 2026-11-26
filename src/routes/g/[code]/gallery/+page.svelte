@@ -47,6 +47,12 @@
 		<option value="">All photos</option>
 		{#each data.setOptions as o}<option value={o.value} selected={data.filter.set === o.value}>({o.n}) {o.label}</option>{/each}
 	</select>
+	{#if data.awardOptions.length}
+		<select name="award" onchange={() => formEl.requestSubmit()} aria-label="Vote">
+			<option value="">All votes</option>
+			{#each data.awardOptions as a}<option value={a.id} selected={data.filter.award === a.id}>({a.n}) {a.name}</option>{/each}
+		</select>
+	{/if}
 	{#if data.isHost}
 		<label class="check small" style="white-space:nowrap"><input type="checkbox" name="unscored" value="1" checked={data.filter.unscored} onchange={() => formEl.requestSubmit()} /> Unscored only</label>
 	{/if}

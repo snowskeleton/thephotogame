@@ -25,6 +25,9 @@
 	<span class="muted small">Category</span>
 	<a class="pill" href="{base}/c/{p.category_id}">{p.category}</a>
 	{#if p.item}<a class="pill" href="{base}/gallery?cat={p.category_id}&item={p.item_id}" title="Checklist item">✓ {p.item}</a>{/if}
+	{#each data.votes as v (v.award_id)}
+		<a class="pill" href="{base}/gallery?award={v.award_id}" title="Votes this photo got for {v.name}">🗳️ {v.name} · {v.n}</a>
+	{/each}
 	{#each [...new Map(data.claims.filter((c) => c.category_id !== p.category_id).map((c) => [c.category_id, c.category]))] as [id, name] (id)}
 		<a class="pill" href="{base}/c/{id}" title="Earns points from this category's options">+ {name}</a>
 	{/each}
