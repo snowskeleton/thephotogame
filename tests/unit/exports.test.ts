@@ -108,3 +108,19 @@ describe('gallery set filter', () => {
 		expect(browseFilter(new URL('https://x/?set=bogus'), true).set).toBeUndefined();
 	});
 });
+
+describe('votes per award', () => {
+	it('players see only closed awards, hosts every non-draft award, and listPhotos filters by award', async () => {
+		const { listPhotos, voteCounts } = await import('../../src/lib/server/photos.ts');
+		const w = await world('closed');
+		const open = await insert("INSERT INTO award (game_id, name, points, scope, status) VALUES (?, 'Funniest', 1, 'game', 'open')", w.g.id);
+		await insert("INSERT INTO award (game_id, name, points, scope, status) VALUES (?, 'Secret', 1, 'game', 'draft')", w.g.id);
+		await run('INSERT INTO vote (award_id, photo_id, user_id) VALUES (?, ?, ?)', open, w.p2, await mkUser());
+		const host = { user: null, isHost: true, teamId: null } as any;
+		const player = { user: null, isHost: false, teamId: null } as any;
+		expect([...(await voteCounts(w.g, player))].map(([id]) => id)).toEqual([w.p1]);
+		expect((await voteCounts(w.g, host)).get(w.p2)).toMatchObject([{ name: 'Funniest', n: 1 }]);
+		expect((await listPhotos(w.g, host, { award: open })).map((p) => p.id)).toEqual([w.p2]);
+		expect(await listPhotos(w.g, player, { award: open })).toEqual([]);
+	});
+});

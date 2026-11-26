@@ -2,7 +2,7 @@ import { all } from '#lib/server/db.ts';
 import { enter } from '#lib/server/game.ts';
 import { itemsFor } from '#lib/server/items.ts';
 import { SET_LABEL, type BrowseSet } from '#lib/browse.ts';
-import { browseFilter, listPhotos, setIds } from '#lib/server/photos.ts';
+import { browseFilter, listPhotos, setIds, voteCounts, votedAwards } from '#lib/server/photos.ts';
 import { scoreGame } from '#lib/server/scoring.ts';
 
 export const load = async ({ params, locals, url }) => {
@@ -14,7 +14,8 @@ export const load = async ({ params, locals, url }) => {
 	// Hosts see each photo's scoring state and can filter to the ones that still need points.
 	const scores = viewer.isHost ? (await scoreGame(game)).photoScores : null;
 	const rows = await listPhotos(game, viewer, filter);
-	const photos = rows.map((p) => ({ ...p, score: scores?.get(p.id) }));
+	const votes = await voteCounts(game, viewer);
+	const photos = rows.map((p) => ({ ...p, score: scores?.get(p.id), awardVotes: votes.get(p.id) ?? [] }));
 	const everything = await listPhotos(game, viewer);
 	const setKinds = (['winners', ...(viewer.isHost ? ['voted'] : []), 'superlatives'] as BrowseSet[]);
 	const sets = new Map(await Promise.all(setKinds.map(async (k) => [k, await setIds(game, k)] as const)));
@@ -26,6 +27,7 @@ export const load = async ({ params, locals, url }) => {
 		team: (p: (typeof everything)[number]) => !filter.team || p.team_id === filter.team,
 		user: (p: (typeof everything)[number]) => !filter.user || p.user_id === filter.user,
 		day: (p: (typeof everything)[number]) => !filter.day || p.day === filter.day,
+		award: (p: (typeof everything)[number]) => !filter.award || !!votes.get(p.id)?.some((v) => v.award_id === filter.award),
 		set: (p: (typeof everything)[number]) => !filter.set || sets.get(filter.set)!.has(p.id),
 		unscored: (p: (typeof everything)[number]) =>
 			!filter.unscored || (scores?.get(p.id)?.pending === true && p.status !== 'disqualified')
@@ -43,9 +45,17 @@ export const load = async ({ params, locals, url }) => {
 	const setCounts = Object.fromEntries(
 		setKinds.map((k) => [k, everything.filter((p) => Object.entries(dims).every(([d, fn]) => d === 'set' || fn(p)) && sets.get(k)!.has(p.id)).length])
 	);
+	const awards = await votedAwards(game, viewer);
+	if (filter.award && !awards.some((a) => a.id === filter.award)) filter.award = undefined;
+	const awardOptions = awards.map((a) => ({
+		id: a.id,
+		name: a.name,
+		n: everything.filter((p) => Object.entries(dims).every(([d, fn]) => d === 'award' || fn(p)) && votes.get(p.id)?.some((v) => v.award_id === a.id)).length
+	}));
 	return {
 		filter,
 		counts,
+		awardOptions,
 		setOptions: setKinds.map((k) => ({ value: k, label: SET_LABEL[k], n: setCounts[k] })),
 		items,
 		photos: filter.unscored ? photos.filter((p) => p.score?.pending && p.status !== 'disqualified') : photos,
