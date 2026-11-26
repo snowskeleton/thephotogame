@@ -86,3 +86,25 @@ describe('exportFiles', () => {
 		expect((await exportFiles(w.g, { kind: 'all', id: 0 })).files).toHaveLength(3);
 	});
 });
+
+describe('gallery set filter', () => {
+	it('listPhotos narrows to winners, any vote and superlatives', async () => {
+		const { listPhotos } = await import('../../src/lib/server/photos.ts');
+		const w = await world('closed');
+		await run("INSERT INTO vote (award_id, photo_id, user_id) VALUES ((SELECT MAX(id) FROM award), ?, ?)", w.p2, await mkUser());
+		await run("INSERT INTO superlative (game_id, title, kind, photo_id, created_at) VALUES (?, 'Best hat', 'photo', ?, 1)", w.g.id, w.p3);
+		const v = { user: null, isHost: true, teamId: null } as any;
+		const ids = async (set: any) => (await listPhotos(w.g, v, { set })).map((p) => p.id).sort();
+		expect(await ids('winners')).toEqual([w.p1]);
+		expect(await ids('voted')).toEqual([w.p1, w.p2].sort());
+		expect(await ids('superlatives')).toEqual([w.p3]);
+		expect(await ids(undefined)).toHaveLength(3);
+	});
+	it('browseFilter reads set from the URL and keeps "voted" for hosts only', async () => {
+		const { browseFilter } = await import('../../src/lib/server/photos.ts');
+		expect(browseFilter(new URL('https://x/?set=winners'), false).set).toBe('winners');
+		expect(browseFilter(new URL('https://x/?set=voted'), false).set).toBeUndefined();
+		expect(browseFilter(new URL('https://x/?set=voted'), true).set).toBe('voted');
+		expect(browseFilter(new URL('https://x/?set=bogus'), true).set).toBeUndefined();
+	});
+});

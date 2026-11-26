@@ -5,7 +5,7 @@ import { adoptGuess, alsoStatements, guessStatements, optionsFor, otherOptionsFo
 import { remove } from '#lib/server/images.ts';
 import { giveTeamPoints } from '#lib/server/grants.ts';
 import { browseFilter, listPhotos, onePhoto } from '#lib/server/photos.ts';
-import { browseQuery, fromGallery } from '#lib/browse.ts';
+import { SET_LABEL, browseQuery, fromGallery } from '#lib/browse.ts';
 import { scoreGame } from '#lib/server/scoring.ts';
 import { itemIn, itemsFor } from '#lib/server/items.ts';
 import { categoryIn, fileInto } from '#lib/server/uploads.ts';
@@ -38,6 +38,7 @@ async function browseNav(event: { url: URL }, game: Awaited<ReturnType<typeof ct
 		filter.cat && (await get<{ name: string }>('SELECT name FROM category WHERE id = ? AND game_id = ?', filter.cat, game.id))?.name,
 		filter.item && (await get<{ label: string }>('SELECT label FROM category_item WHERE id = ?', filter.item))?.label,
 		filter.day,
+		filter.set && SET_LABEL[filter.set],
 		filter.unscored && 'unscored'
 	].filter(Boolean);
 	return {
